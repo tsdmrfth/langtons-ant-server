@@ -1,10 +1,26 @@
 import { Server } from 'http'
 import { RawData, WebSocket, WebSocketServer as WSServer } from 'ws'
 import { GameEngine } from '../game/GameEngine'
-import { GameConfig, GameStateSnapshot, Rule, WebSocketMessage } from '../types/game'
+import {
+  ErrorPayload,
+  GameConfig,
+  GameStateSnapshot,
+  PlaceAntPayload,
+  PlaceAntResponsePayload,
+  RuleChangePayload,
+  RuleChangeResponsePayload,
+  TileFlipPayload,
+  TileFlipResponsePayload,
+  WebSocketMessage
+} from '../types/game'
 
 const RATE_LIMIT_WINDOW_MS = 1000
 const MAX_MESSAGES_PER_WINDOW = 30
+const VALID_INCOMING_MESSAGE_TYPES = [
+  'PLACE_ANT',
+  'RULE_CHANGE',
+  'TILE_FLIP',
+]
 
 export class WebSocketServer {
   private wss: WSServer
@@ -47,6 +63,18 @@ export class WebSocketServer {
         socket.isAlive = true
         socket.playerId = player.id
         this.clients.set(player.id, socket)
+        const fullState = this.gameEngine.getFullState()
+        this.sendToClient(socket, {
+          type: 'WELCOME',
+          payload: {
+            player,
+            gameState: {
+              ants: fullState.ants,
+              cells: Object.fromEntries(fullState.cells)
+            }
+          }
+        })
+
         this.broadcastGameState({
           type: 'PLAYER_JOIN',
           payload: { playerId: player.id, color: player.color }
@@ -57,14 +85,17 @@ export class WebSocketServer {
             return
           }
 
+          const raw = typeof data === 'string' ? data : data.toString()
+          const message: WebSocketMessage = JSON.parse(raw)
+
           try {
-            const raw = typeof data === 'string' ? data : data.toString()
-            const message: WebSocketMessage = JSON.parse(raw)
             this.validateMessage(message)
-            this.handleMessage(player.id, message)
           } catch (error) {
             this.handleError(socket, error)
+            return
           }
+
+          this.handleMessage(player.id, message)
         })
         socket.on('close', () => {
           this.handleDisconnect(player.id)
@@ -115,138 +146,109 @@ export class WebSocketServer {
       throw new Error('Invalid message format: missing payload')
     }
 
-    switch (message.type) {
+    if (!VALID_INCOMING_MESSAGE_TYPES.includes(message.type)) {
+      throw new Error(`Invalid message type: ${message.type}`)
+    }
+  }
+
+  private handleMessage(playerId: string, incomingMessage: WebSocketMessage): void {
+    const client = this.clients.get(playerId)
+
+    if (!client) {
+      console.error('No active client for player:', playerId)
+      return
+    }
+
+    switch (incomingMessage.type) {
       case 'PLACE_ANT':
-        this.validateAntPlaceMessage(message)
+        this.handlePlaceAntMessage(client, playerId, incomingMessage)
         break
       case 'RULE_CHANGE':
-        this.validateRuleChangeMessage(message)
-        break
-      case 'PLAYER_JOIN':
-      case 'PLAYER_LEAVE':
-      case 'ERROR':
+        this.handleRuleChangeMessage(client, playerId, incomingMessage)
         break
       case 'TILE_FLIP':
-        this.validateTileFlipMessage(message)
+        this.handleTileFlipMessage(client, playerId, incomingMessage)
         break
       default:
-        throw new Error(`Invalid message type: ${message.type}`)
+        break
     }
   }
 
-  private validateAntPlaceMessage(message: WebSocketMessage): void {
-    const { position, rules } = message.payload
-
-    if (!position) {
-      throw new Error('Invalid ant position: position is required')
-    }
-
-    if (typeof position.x !== 'number' || typeof position.y !== 'number') {
-      throw new Error('Invalid ant position: ant position x and y must be numbers')
-    }
-
-    if (position.x < 0 || position.y < 0) {
-      throw new Error('Invalid ant position: ant position x and y must be positive')
-    }
-
-    if (!Array.isArray(rules) || rules.length === 0) {
-      throw new Error('Invalid ant rules: rules must be a non-empty array')
-    }
-
-    this.validateRules(rules)
-  }
-
-  private validateRuleChangeMessage(message: WebSocketMessage): void {
-    const { rules } = message.payload
-
-    if (!Array.isArray(rules) || rules.length === 0) {
-      throw new Error('Invalid rules array')
-    }
-
-    this.validateRules(rules)
-  }
-
-  private validateRules(rules: Rule[]): void {
-    for (const rule of rules) {
-      if (!rule.currentColor || !rule.newColor || !rule.turnDirection) {
-        throw new Error('Invalid rule format: currentColor, newColor, and turnDirection are required')
-      }
-
-      if (!['LEFT', 'RIGHT'].includes(rule.turnDirection)) {
-        throw new Error('Invalid turn direction: turnDirection must be LEFT or RIGHT')
-      }
-    }
-  }
-
-  private handleMessage(playerId: string, message: WebSocketMessage): void {
+  private handlePlaceAntMessage(client: WebSocket, playerId: string, incomingMessage: WebSocketMessage): void {
+    const { position, rules } = incomingMessage.payload as PlaceAntPayload
     try {
-      switch (message.type) {
-        case 'PLACE_ANT':
-          const { position, rules } = message.payload
-          this.gameEngine.placeAnt(playerId, position, rules)
-          const snapshot = this.gameEngine.getGameStateSnapshot()
-          const antPlaceMessage: WebSocketMessage = {
-            type: 'PLACE_ANT',
-            payload: { cells: snapshot.cells, ants: snapshot.ants }
-          }
-          this.broadcastGameState(antPlaceMessage)
-          break
-
-        case 'RULE_CHANGE':
-          const { rules: newRules } = message.payload
-          this.gameEngine.updateRules(playerId, newRules)
-          this.broadcastGameState({
-            type: 'RULE_CHANGE',
-            payload: { playerId, rules: newRules }
-          })
-          break
-
-        case 'TILE_FLIP':
-          const { position: flipPosition } = message.payload
-          const flipped = this.gameEngine.flipTile(playerId, flipPosition)
-
-          if (!flipped) {
-            throw new Error('Invalid tile flip')
-          }
-
-          const flipSnapshot = this.gameEngine.getGameStateSnapshot()
-          this.broadcastGameState({
-            type: 'TILE_FLIP',
-            payload: { cells: flipSnapshot.cells }
-          })
-          break
+      const ant = this.gameEngine.placeAnt(playerId, position, rules)
+      const snapshot = this.gameEngine.getGameStateSnapshot()
+      const responsePayload: PlaceAntResponsePayload = {
+        ant,
+        cells: Object.fromEntries(snapshot.cells)
       }
+      this.broadcastGameState({
+        type: 'PLACE_ANT',
+        payload: responsePayload
+      })
     } catch (error) {
-      const client = this.clients.get(playerId)
+      this.handleError(client, error)
+    }
+  }
 
-      if (client) {
-        this.handleError(client, error)
-      } else {
-        console.error('No active client while handling error:', error)
+  private handleRuleChangeMessage(client: WebSocket, playerId: string, incomingMessage: WebSocketMessage): void {
+    const { rules } = incomingMessage.payload as RuleChangePayload
+    try {
+      this.gameEngine.updateRules(playerId, rules)
+      const responsePayload: RuleChangeResponsePayload = {
+        playerId,
+        rules
       }
+      this.broadcastGameState({
+        type: 'RULE_CHANGE',
+        payload: responsePayload
+      })
+    } catch (error) {
+      this.handleError(client, error)
+    }
+  }
+
+  private handleTileFlipMessage(client: WebSocket, playerId: string, incomingMessage: WebSocketMessage): void {
+    const { position } = incomingMessage.payload as TileFlipPayload
+    try {
+      this.gameEngine.flipTile(playerId, position)
+      const snapshot = this.gameEngine.getGameStateSnapshot()
+      const responsePayload: TileFlipResponsePayload = {
+        cells: Object.fromEntries(snapshot.cells)
+      }
+      this.broadcastGameState({
+        type: 'TILE_FLIP',
+        payload: responsePayload
+      })
+    } catch (error) {
+      this.handleError(client, error)
     }
   }
 
   private handleDisconnect(playerId: string): void {
     try {
-      this.gameEngine.removePlayer(playerId)
+      const { clearedCells, antId } = this.gameEngine.removePlayer(playerId)
       this.clients.delete(playerId)
-      const snapshot = this.gameEngine.getGameStateSnapshot()
+
       const message: WebSocketMessage = {
         type: 'PLAYER_LEAVE',
-        payload: { playerId, cells: snapshot.cells, ants: snapshot.ants }
+        payload: { playerId, cells: Object.fromEntries(clearedCells) }
       }
       this.broadcastGameState(message)
     } catch (error) {
-      console.error('Error handling disconnect:', error)
+      if (!(error instanceof Error && error.message === 'Player not found')) {
+        console.error('Error handling disconnect:', error)
+      }
     }
   }
 
-  private handleError(ws: WebSocket, error: unknown): void {
+  private handleError(ws: WebSocket, error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+    const errorPayload: ErrorPayload = { message: errorMessage }
     this.sendToClient(ws, {
       type: 'ERROR',
-      payload: { message: errorMessage }
+      payload: errorPayload
     })
   }
 
@@ -264,13 +266,16 @@ export class WebSocketServer {
   private broadcastGameStateSnapshot() {
     const snapshot: GameStateSnapshot = this.gameEngine.getGameStateSnapshot()
 
-    if (snapshot.ants.length === 0 && Object.keys(snapshot.cells).length === 0) {
+    if (snapshot.ants.length === 0 && snapshot.cells.size === 0) {
       return
     }
 
     const message: WebSocketMessage = {
       type: 'GAME_STATE_SNAPSHOT',
-      payload: snapshot
+      payload: {
+        ants: snapshot.ants,
+        cells: Object.fromEntries(snapshot.cells),
+      },
     }
     this.broadcastGameState(message)
   }
@@ -297,22 +302,6 @@ export class WebSocketServer {
       this.gameLoop = null
     }
     this.wss.close()
-  }
-
-  private validateTileFlipMessage(message: WebSocketMessage): void {
-    const { position } = message.payload
-
-    if (!position) {
-      throw new Error('Invalid tile flip: position is required')
-    }
-
-    if (typeof position.x !== 'number' || typeof position.y !== 'number') {
-      throw new Error('Invalid tile flip: x and y must be numbers')
-    }
-
-    if (position.x < 0 || position.y < 0) {
-      throw new Error('Invalid tile flip: x and y must be positive')
-    }
   }
 
   private isRateLimited(playerId: string): boolean {

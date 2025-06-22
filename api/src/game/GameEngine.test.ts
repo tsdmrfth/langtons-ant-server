@@ -1,479 +1,328 @@
+import { Color, GameConfig, Rule } from '../types/game'
 import { GameEngine } from './GameEngine'
-import { GameConfig, Position, Rule } from '../types/game'
 
-describe('GameEngine', () => {
-    const gameConfig: GameConfig = {
-        gridWidth: 100,
-        gridHeight: 100,
-        tickInterval: 250,
-        chunkSize: 10,
-        maxPlayers: 10,
-        heartbeatInterval: 10000
-    }
+const COLOR_WHITE = '#FFFFFF'
+const RULE_R: Rule = { cellColor: COLOR_WHITE, turnDirection: 'RIGHT' }
+const RULE_L: Rule = { cellColor: COLOR_WHITE, turnDirection: 'LEFT' }
+
+describe('GameEngine.v1', () => {
     let gameEngine: GameEngine
+    let gameConfig: GameConfig
 
     beforeEach(() => {
+        gameConfig = {
+            gridWidth: 100,
+            gridHeight: 100,
+            tickInterval: 250,
+            maxPlayers: 10,
+            heartbeatInterval: 10000
+        }
         gameEngine = new GameEngine(gameConfig)
     })
 
+    afterEach(() => {
+        gameEngine.reset()
+    })
+
     describe('Player Management', () => {
-        it('should add a player with unique color', () => {
-            const player = gameEngine.addPlayer()
-            expect(player).toBeDefined()
-            expect(player.id).toBeDefined()
-            expect(player.color).toMatch(/^#[0-9A-F]{6}$/)
-            expect(player.color).not.toBe('#FFFFFF')
-            expect(player.antId).toBeNull()
-        })
+        describe('addPlayer', () => {
+            it('should add a new player with a unique ID and color', () => {
+                const player1 = gameEngine.addPlayer()
+                const player2 = gameEngine.addPlayer()
+                expect(player1.id).not.toBe(player2.id)
+                expect(player1.color).not.toBe(player2.color)
+                expect(player1.color).not.toBe(COLOR_WHITE)
+                expect(gameEngine.getState().players.size).toBe(2)
+            })
 
-        it('should remove a player and their ant', () => {
-            const player = gameEngine.addPlayer()
-            const position: Position = { x: 0, y: 0 }
-            const rules: Rule[] = [{
-                currentColor: '#FFFFFF',
-                newColor: '#000000',
-                turnDirection: 'RIGHT'
-            }]
-            gameEngine.placeAnt(player.id, position, rules)
-            gameEngine.removePlayer(player.id)
-            const state = gameEngine.getState()
-            expect(state.players.has(player.id)).toBeFalsy()
-            expect(state.ants.find(a => a.id === player.antId)).toBeUndefined()
-        })
-
-        it('should enforce maximum player limit', () => {
-            for (let i = 0; i < gameConfig.maxPlayers; i++) {
+            it('should throw an error when maxPlayers is reached', () => {
+                gameConfig.maxPlayers = 1
+                gameEngine = new GameEngine(gameConfig)
                 gameEngine.addPlayer()
-            }
-
-            expect(() => gameEngine.addPlayer()).toThrow('Maximum number of players reached')
-        })
-    })
-
-    describe('Ant Management', () => {
-        it('should place an ant for a player', () => {
-            const player = gameEngine.addPlayer()
-            const position: Position = { x: 0, y: 0 }
-            const rules: Rule[] = [{
-                currentColor: '#FFFFFF',
-                newColor: '#000000',
-                turnDirection: 'RIGHT'
-            }]
-
-            const ant = gameEngine.placeAnt(player.id, position, rules)
-            expect(ant).toBeDefined()
-            expect(ant?.position).toEqual(position)
-            expect(ant?.color).toBe(player.color)
-            expect(ant?.rules).toEqual(rules)
-        })
-
-        it('should update ant rules', () => {
-            const player = gameEngine.addPlayer()
-            const position: Position = { x: 0, y: 0 }
-            const initialRules: Rule[] = [{
-                currentColor: '#FFFFFF',
-                newColor: '#000000',
-                turnDirection: 'RIGHT'
-            }]
-            const newRules: Rule[] = [{
-                currentColor: '#FFFFFF',
-                newColor: '#FF0000',
-                turnDirection: 'LEFT'
-            }]
-            gameEngine.placeAnt(player.id, position, initialRules)
-            const success = gameEngine.updateRules(player.id, newRules)
-            expect(success).toBeTruthy()
-            const state = gameEngine.getState()
-            const ant = state.ants.find(a => a.id === player.antId)
-            expect(ant?.rules).toEqual(newRules)
-        })
-
-        it('should prevent a player from placing multiple ants', () => {
-            const player = gameEngine.addPlayer()
-            const pos1: Position = { x: 0, y: 0 }
-            const pos2: Position = { x: 1, y: 1 }
-            const rules: Rule[] = [{
-                currentColor: '#FFFFFF',
-                newColor: '#000000',
-                turnDirection: 'RIGHT'
-            }]
-
-            gameEngine.placeAnt(player.id, pos1, rules)
-            expect(() => gameEngine.placeAnt(player.id, pos2, rules)).toThrow('Player already has an ant')
-        })
-    })
-
-    describe('Game Mechanics', () => {
-        it('should move ant according to rules', () => {
-            const player = gameEngine.addPlayer()
-            const position: Position = { x: 0, y: 0 }
-            const rules: Rule[] = [{
-                currentColor: '#FFFFFF',
-                newColor: '#000000',
-                turnDirection: 'RIGHT'
-            }]
-            gameEngine.placeAnt(player.id, position, rules)
-            gameEngine.tick()
-            const state = gameEngine.getState()
-            const ant = state.ants.find(a => a.id === player.antId)
-            expect(ant?.position).toEqual({ x: 1, y: 0 })
-            expect(ant?.direction).toBe('RIGHT')
-        })
-
-        it('should wrap ant position around grid boundaries', () => {
-            const player = gameEngine.addPlayer()
-            const position: Position = { x: gameConfig.gridWidth - 1, y: 0 }
-            const rules: Rule[] = [{
-                currentColor: '#FFFFFF',
-                newColor: '#000000',
-                turnDirection: 'RIGHT'
-            }]
-            gameEngine.placeAnt(player.id, position, rules)
-            gameEngine.tick()
-            const state = gameEngine.getState()
-            const ant = state.ants.find(a => a.id === player.antId)
-            expect(ant?.position).toEqual({ x: 0, y: 0 })
-        })
-
-        it('should update cell colors according to rules', () => {
-            const player = gameEngine.addPlayer()
-            const position: Position = { x: 0, y: 0 }
-            const rules: Rule[] = [{
-                currentColor: '#FFFFFF',
-                newColor: '#000000',
-                turnDirection: 'RIGHT'
-            }]
-
-            gameEngine.placeAnt(player.id, position, rules)
-            gameEngine.tick()
-
-            const state = gameEngine.getState()
-            const cellKey = `${position.x},${position.y}`
-            expect(state.grid.cells.get(cellKey)).toBe('#000000')
-        })
-
-        it('should handle multiple ants in the same cell', () => {
-            const player1 = gameEngine.addPlayer()
-            const player2 = gameEngine.addPlayer()
-            const position: Position = { x: 0, y: 0 }
-            const rules: Rule[] = [{
-                currentColor: '#FFFFFF',
-                newColor: '#000000',
-                turnDirection: 'RIGHT'
-            }]
-            gameEngine.placeAnt(player1.id, position, rules)
-            expect(() => gameEngine.placeAnt(player2.id, position, rules)).toThrow()
-        })
-
-        it('should resolve collisions such that the first ant moves and the second stays', () => {
-            const player1 = gameEngine.addPlayer()
-            const player2 = gameEngine.addPlayer()
-
-            const rules1: Rule[] = [{
-                currentColor: '#FFFFFF',
-                newColor: player1.color,
-                turnDirection: 'RIGHT'
-            }]
-
-            const rules2: Rule[] = [{
-                currentColor: '#FFFFFF',
-                newColor: player2.color,
-                turnDirection: 'LEFT'
-            }]
-
-            const pos1: Position = { x: 0, y: 1 }
-            const pos2: Position = { x: 2, y: 1 }
-            gameEngine.placeAnt(player1.id, pos1, rules1)
-            gameEngine.placeAnt(player2.id, pos2, rules2)
-            gameEngine.tick()
-            const state = gameEngine.getState()
-            const ant1 = state.ants.find(a => a.id === player1.antId)
-            const ant2 = state.ants.find(a => a.id === player2.antId)
-            expect(ant1?.position).toEqual({ x: 1, y: 1 })
-            expect(ant1?.direction).toBe('RIGHT')
-            expect(ant2?.position).toEqual({ x: 2, y: 1 })
-            expect(ant2?.direction).toBe('LEFT')
-        })
-
-        it('should treat other players color as white but not repaint their tile', () => {
-            const player1 = gameEngine.addPlayer()
-            const rules1: Rule[] = [{ currentColor: '#FFFFFF', newColor: player1.color, turnDirection: 'RIGHT' }]
-            gameEngine.placeAnt(player1.id, { x: 0, y: 0 }, rules1)
-            gameEngine.tick() // ant moves to 1,0 and paints 0,0 with its color
-
-            const tileColorAfterPlayer1 = gameEngine.getState().grid.cells.get('0,0')
-
-            const player2 = gameEngine.addPlayer()
-            const rules2: Rule[] = [{ currentColor: '#FFFFFF', newColor: '#FF0000', turnDirection: 'RIGHT' }]
-            gameEngine.placeAnt(player2.id, { x: 0, y: 0 }, rules2) // tile occupied by color of player1 but no ant present
-            gameEngine.tick()
-
-            const cellKey = '0,0'
-            const state = gameEngine.getState()
-            expect(tileColorAfterPlayer1).toBeDefined()
-            expect(state.grid.cells.get(cellKey)).toBe(tileColorAfterPlayer1) // remains unchanged
-        })
-    })
-
-    describe('Chunk Management', () => {
-        it('should create correct number of chunks', () => {
-            const expectedChunksX = Math.ceil(gameConfig.gridWidth / gameConfig.chunkSize)
-            const expectedChunksY = Math.ceil(gameConfig.gridHeight / gameConfig.chunkSize)
-            const expectedTotalChunks = expectedChunksX * expectedChunksY
-            const chunks = (gameEngine as any).chunks
-            expect(chunks.size).toBe(expectedTotalChunks)
-        })
-
-        it('should update chunk membership when ant moves', () => {
-            const player = gameEngine.addPlayer()
-            const position: Position = { x: 9, y: 0 }
-            const rules: Rule[] = [{
-                currentColor: '#FFFFFF',
-                newColor: '#000000',
-                turnDirection: 'RIGHT'
-            }]
-            gameEngine.placeAnt(player.id, position, rules)
-            gameEngine.tick()
-            const chunks = (gameEngine as any).chunks
-            const oldChunkKey = '0,0'
-            const newChunkKey = '1,0'
-            const oldCellKey = '9,0'
-            const newCellKey = '10,0'
-            expect(chunks.get(oldChunkKey)?.has(oldCellKey)).toBeFalsy()
-            expect(chunks.get(newChunkKey)?.has(newCellKey)).toBeTruthy()
-        })
-
-        it('should remove cell from chunk after ant removal', () => {
-            const player = gameEngine.addPlayer()
-            const position: Position = { x: 0, y: 0 }
-            const rules: Rule[] = [{ currentColor: '#FFFFFF', newColor: '#000000', turnDirection: 'RIGHT' }]
-            gameEngine.placeAnt(player.id, position, rules)
-            const cellKey = '0,0'
-            const chunkKey = '0,0'
-            const chunksBefore = (gameEngine as any).chunks
-            expect(chunksBefore.get(chunkKey).has(cellKey)).toBeTruthy()
-
-            gameEngine.removePlayer(player.id)
-            const chunksAfter = (gameEngine as any).chunks
-            expect(chunksAfter.get(chunkKey).has(cellKey)).toBeFalsy()
-        })
-    })
-
-    describe('Validation', () => {
-        it('should throw when placing ant out of bounds', () => {
-            const player = gameEngine.addPlayer()
-            const position: Position = { x: -1, y: 0 }
-            expect(() => gameEngine.placeAnt(player.id, position, [])).toThrow()
-        })
-
-        it('should throw when placing ant with empty rules', () => {
-            const player = gameEngine.addPlayer()
-            const position: Position = { x: 0, y: 0 }
-            expect(() => gameEngine.placeAnt(player.id, position, [])).toThrow()
-        })
-    })
-
-    describe('flipTile', () => {
-        it('should allow player to flip their own tile', () => {
-            const player = gameEngine.addPlayer()
-            const position: Position = { x: 0, y: 0 }
-            const flipped = gameEngine.flipTile(player.id, position)
-            expect(flipped).toBeTruthy()
-            const cellKey = '0,0'
-            const state = gameEngine.getState()
-            expect(state.grid.cells.get(cellKey)).toBe(player.color)
-        })
-
-        it('should prevent flipping another players tile', () => {
-            const player1 = gameEngine.addPlayer()
-            const player2 = gameEngine.addPlayer()
-            const position: Position = { x: 1, y: 0 }
-            gameEngine.flipTile(player1.id, position)
-            const success = gameEngine.flipTile(player2.id, position)
-            expect(success).toBeFalsy()
-            const cellKey = '1,0'
-            const state = gameEngine.getState()
-            expect(state.grid.cells.get(cellKey)).toBe(player1.color)
-        })
-    })
-
-    describe('Stress Test', () => {
-        jest.setTimeout(20000)
-
-        it('handles 100 ants on 1000X1000 grid for 1000 ticks without errors', () => {
-            const gameConfig: GameConfig = {
-                gridWidth: 1000,
-                gridHeight: 1000,
-                tickInterval: 250,
-                chunkSize: 50,
-                maxPlayers: 100,
-                heartbeatInterval: 10000
-            }
-            const engine = new GameEngine(gameConfig)
-            const baseRule: Rule = {
-                currentColor: '#FFFFFF',
-                newColor: '#000000',
-                turnDirection: 'RIGHT'
-            }
-            const positions = new Set<string>()
-            for (let i = 0; i < 100; i++) {
-                const player = engine.addPlayer()
-                let x: number
-                let y: number
-                do {
-                    x = Math.floor(Math.random() * gameConfig.gridWidth)
-                    y = Math.floor(Math.random() * gameConfig.gridHeight)
-                } while (positions.has(`${x},${y}`))
-                positions.add(`${x},${y}`)
-                engine.placeAnt(player.id, { x, y }, [baseRule])
-            }
-            expect(engine.getState().ants.length).toBe(100)
-
-            for (let i = 0; i < 1000; i++) {
-                engine.tick()
-            }
-
-            const state = engine.getState()
-            expect(state.ants.length).toBe(100)
-
-            state.ants.forEach(ant => {
-                expect(ant.position.x).toBeGreaterThanOrEqual(0)
-                expect(ant.position.x).toBeLessThan(gameConfig.gridWidth)
-                expect(ant.position.y).toBeGreaterThanOrEqual(0)
-                expect(ant.position.y).toBeLessThan(gameConfig.gridHeight)
+                expect(() => gameEngine.addPlayer()).toThrow('Maximum number of players reached')
             })
         })
 
-        it('handles 100 ants on 1000X1000 grid for 1000 ticks with 100 milliseconds tick interval without errors', () => {
-            const gameConfig: GameConfig = {
-                gridWidth: 1000,
-                gridHeight: 1000,
-                tickInterval: 100,
-                chunkSize: 50,
-                maxPlayers: 100,
-                heartbeatInterval: 10000
-            }
-            const engine = new GameEngine(gameConfig)
-            const baseRule: Rule = {
-                currentColor: '#FFFFFF',
-                newColor: '#000000',
-                turnDirection: 'RIGHT'
-            }
-            const positions = new Set<string>()
-            for (let i = 0; i < 100; i++) {
-                const player = engine.addPlayer()
-                let x: number
-                let y: number
-                do {
-                    x = Math.floor(Math.random() * gameConfig.gridWidth)
-                    y = Math.floor(Math.random() * gameConfig.gridHeight)
-                } while (positions.has(`${x},${y}`))
-                positions.add(`${x},${y}`)
-                engine.placeAnt(player.id, { x, y }, [baseRule])
-            }
-            expect(engine.getState().ants.length).toBe(100)
-
-            for (let i = 0; i < 1000; i++) {
-                engine.tick()
-            }
-
-            const state = engine.getState()
-            expect(state.ants.length).toBe(100)
-
-            state.ants.forEach(ant => {
-                expect(ant.position.x).toBeGreaterThanOrEqual(0)
-                expect(ant.position.x).toBeLessThan(gameConfig.gridWidth)
-                expect(ant.position.y).toBeGreaterThanOrEqual(0)
-                expect(ant.position.y).toBeLessThan(gameConfig.gridHeight)
+        describe('removePlayer', () => {
+            it('should remove a player and their ant from the game', () => {
+                const player = gameEngine.addPlayer()
+                gameEngine.placeAnt(player.id, { x: 10, y: 10 })
+                expect(gameEngine.getState().ants.length).toBe(1)
+                gameEngine.removePlayer(player.id)
+                expect(gameEngine.getState().players.has(player.id)).toBe(false)
+                expect(gameEngine.getState().ants.length).toBe(0)
             })
-        })
 
-        it('handles 100 ants on 10000X10000 grid for 1000 ticks with 100 milliseconds tick interval without errors', () => {
-            const gameConfig: GameConfig = {
-                gridWidth: 10000,
-                gridHeight: 10000,
-                tickInterval: 100,
-                chunkSize: 50,
-                maxPlayers: 100,
-                heartbeatInterval: 10000
-            }
-            const engine = new GameEngine(gameConfig)
-            const baseRule: Rule = {
-                currentColor: '#FFFFFF',
-                newColor: '#000000',
-                turnDirection: 'RIGHT'
-            }
-            const positions = new Set<string>()
-            for (let i = 0; i < 100; i++) {
-                const player = engine.addPlayer()
-                let x: number
-                let y: number
-                do {
-                    x = Math.floor(Math.random() * gameConfig.gridWidth)
-                    y = Math.floor(Math.random() * gameConfig.gridHeight)
-                } while (positions.has(`${x},${y}`))
-                positions.add(`${x},${y}`)
-                engine.placeAnt(player.id, { x, y }, [baseRule])
-            }
-            expect(engine.getState().ants.length).toBe(100)
-
-            for (let i = 0; i < 1000; i++) {
-                engine.tick()
-            }
-
-            const state = engine.getState()
-            expect(state.ants.length).toBe(100)
-
-            state.ants.forEach(ant => {
-                expect(ant.position.x).toBeGreaterThanOrEqual(0)
-                expect(ant.position.x).toBeLessThan(gameConfig.gridWidth)
-                expect(ant.position.y).toBeGreaterThanOrEqual(0)
-                expect(ant.position.y).toBeLessThan(gameConfig.gridHeight)
+            it('should clear the player tiles from the grid on removal', () => {
+                const player = gameEngine.addPlayer()
+                gameEngine.flipTile(player.id, { x: 5, y: 5 })
+                gameEngine.flipTile(player.id, { x: 6, y: 6 })
+                expect(gameEngine.getCellColor({ x: 5, y: 5 })).toBe(player.color)
+                const { clearedCells } = gameEngine.removePlayer(player.id)
+                expect(gameEngine.getCellColor({ x: 5, y: 5 })).toBe(COLOR_WHITE)
+                expect(clearedCells.get('5,5')).toBe(COLOR_WHITE)
+                expect(clearedCells.size).toBe(2)
             })
-        })
 
-        it('handles 1000 ants on 1000X1000 grid for 1000 ticks with 100 milliseconds tick interval without errors', () => {
-            const gameConfig: GameConfig = {
-                gridWidth: 1000,
-                gridHeight: 1000,
-                tickInterval: 100,
-                chunkSize: 50,
-                maxPlayers: 1000,
-                heartbeatInterval: 10000
-            }
-            const engine = new GameEngine(gameConfig)
-            const baseRule: Rule = {
-                currentColor: '#FFFFFF',
-                newColor: '#000000',
-                turnDirection: 'RIGHT'
-            }
-            const positions = new Set<string>()
-            for (let i = 0; i < 1000; i++) {
-                const player = engine.addPlayer()
-                let x: number
-                let y: number
-                do {
-                    x = Math.floor(Math.random() * gameConfig.gridWidth)
-                    y = Math.floor(Math.random() * gameConfig.gridHeight)
-                } while (positions.has(`${x},${y}`))
-                positions.add(`${x},${y}`)
-                engine.placeAnt(player.id, { x, y }, [baseRule])
-            }
-            expect(engine.getState().ants.length).toBe(1000)
+            it('should remove a player without an ant', () => {
+                const player = gameEngine.addPlayer()
+                gameEngine.removePlayer(player.id)
+                expect(gameEngine.getState().players.has(player.id)).toBe(false)
+            })
 
-            for (let i = 0; i < 1000; i++) {
-                engine.tick()
-            }
-
-            const state = engine.getState()
-            expect(state.ants.length).toBe(1000)
-
-            state.ants.forEach(ant => {
-                expect(ant.position.x).toBeGreaterThanOrEqual(0)
-                expect(ant.position.x).toBeLessThan(gameConfig.gridWidth)
-                expect(ant.position.y).toBeGreaterThanOrEqual(0)
-                expect(ant.position.y).toBeLessThan(gameConfig.gridHeight)
+            it('should throw an error if the player does not exist', () => {
+                expect(() => gameEngine.removePlayer('non-existent-id')).toThrow('Player not found')
             })
         })
     })
-})
+
+    describe('Ant Placement and Rules', () => {
+        let playerId: string
+
+        beforeEach(() => {
+            gameEngine = new GameEngine(gameConfig)
+            playerId = gameEngine.addPlayer().id
+        })
+
+        describe('placeAnt', () => {
+            const rules: Rule[] = [{ cellColor: COLOR_WHITE, turnDirection: 'LEFT' }]
+
+            it('should successfully place an ant', () => {
+                const ant = gameEngine.placeAnt(playerId, { x: 50, y: 50 }, rules)
+                const state = gameEngine.getState()
+                expect(state.ants.length).toBe(1)
+                expect(state.ants[0]).toEqual(ant)
+                expect(state.players.get(playerId)?.antId).toBe(ant.id)
+            })
+
+            it('should apply default rules if none are provided', () => {
+                const ant = gameEngine.placeAnt(playerId, { x: 50, y: 50 }, [])
+                expect(ant.rules.length).toBe(2)
+                expect(ant.rules[0]).toEqual({ cellColor: COLOR_WHITE, turnDirection: 'LEFT' })
+                expect(ant.rules[1]).toEqual({ cellColor: ant.color, turnDirection: 'RIGHT' })
+            })
+
+            it('should throw an error if player does not exist', () => {
+                expect(() => gameEngine.placeAnt('fake-player', { x: 0, y: 0 }, rules)).toThrow('Player not found')
+            })
+
+            it('should throw an error if player already has an ant', () => {
+                gameEngine.placeAnt(playerId, { x: 1, y: 1 }, rules)
+                expect(() => gameEngine.placeAnt(playerId, { x: 2, y: 2 }, rules)).toThrow('Player already has an ant')
+            })
+
+            it('should throw an error if position is out of bounds', () => {
+                expect(() => gameEngine.placeAnt(playerId, { x: -1, y: 0 }, rules)).toThrow('Position out of bounds')
+            })
+
+            it('should throw an error if position is occupied', () => {
+                gameEngine.placeAnt(playerId, { x: 1, y: 1 }, rules)
+                const player2Id = gameEngine.addPlayer().id
+                expect(() => gameEngine.placeAnt(player2Id, { x: 1, y: 1 }, rules)).toThrow('An ant already exists at this position')
+            })
+        })
+
+        describe('updateRules', () => {
+            const rules: Rule[] = [{ cellColor: COLOR_WHITE, turnDirection: 'LEFT' }]
+
+            it('should successfully update rules for an existing ant', () => {
+                const ant = gameEngine.placeAnt(playerId, { x: 1, y: 1 }, rules)
+                const newRules: Rule[] = [{ cellColor: '#282C34', turnDirection: 'RIGHT' }]
+                gameEngine.updateRules(playerId, newRules)
+                expect(ant.rules.find(rule => rule.cellColor === '#282C34')).toBeDefined()
+            })
+
+            it('should throw an error if rules are empty', () => {
+                const ant = gameEngine.placeAnt(playerId, { x: 1, y: 1 }, rules)
+                expect(() => gameEngine.updateRules(playerId, [])).toThrow('Rules cannot be empty')
+            })
+
+            it('should throw an error if player has no ant', () => {
+                expect(() => gameEngine.updateRules(playerId, rules)).toThrow('Player has no ant')
+            })
+
+            it('should not override mandatory rules', () => {
+                const gameEngine = new GameEngine(gameConfig)
+                const player = gameEngine.addPlayer()
+                const playerId = player.id
+                gameEngine.placeAnt(playerId, { x: 1, y: 1 })
+                const newRules: Rule[] = [{ cellColor: '#282C34', turnDirection: 'RIGHT' }]
+                gameEngine.updateRules(playerId, newRules)
+                const ant = gameEngine.getState().ants[0]
+                expect(ant.rules.length).toBe(3)
+                expect(ant.rules.find(rule => rule.cellColor === COLOR_WHITE)).toBeDefined()
+                expect(ant.rules.find(rule => rule.cellColor === ant.color)).toBeDefined()
+                expect(ant.rules.find(rule => rule.cellColor === '#282C34')).toBeDefined()
+            })
+
+            it('should throw an error if a rule has an invalid color', () => {
+                const invalidRules = [{ cellColor: 'invalid', turnDirection: 'LEFT' }] as any
+                expect(() => (gameEngine as any).validateRules(invalidRules)).toThrow('Invalid cell color: cellColor must be a valid hex color')
+            })
+        })
+
+        describe('validateRules', () => {
+            it('should throw an error if a rule is missing cellColor', () => {
+                const invalidRules = [{ turnDirection: 'LEFT' }] as any
+                expect(() => (gameEngine as any).validateRules(invalidRules)).toThrow('cellColor and turnDirection are required')
+            })
+
+            it('should throw an error if a rule is missing turnDirection', () => {
+                const invalidRules = [{ cellColor: COLOR_WHITE }] as any
+                expect(() => (gameEngine as any).validateRules(invalidRules)).toThrow('cellColor and turnDirection are required')
+            })
+
+            it('should throw an error if turnDirection is invalid', () => {
+                const invalidRules = [{ cellColor: COLOR_WHITE, turnDirection: 'STRAIGHT' }] as any
+                expect(() => (gameEngine as any).validateRules(invalidRules)).toThrow('Invalid turn direction')
+            })
+
+            it('should throw an error for duplicate cell colors in rules', () => {
+                const invalidRules: Rule[] = [
+                    { cellColor: COLOR_WHITE, turnDirection: 'LEFT' },
+                    { cellColor: COLOR_WHITE, turnDirection: 'RIGHT' }
+                ]
+                expect(() => (gameEngine as any).validateRules(invalidRules)).toThrow('Rules cannot have the same current color')
+            })
+
+            it('should pass for a valid set of rules', () => {
+                const validRules: Rule[] = [{ cellColor: COLOR_WHITE, turnDirection: 'LEFT' }]
+                expect(() => (gameEngine as any).validateRules(validRules)).not.toThrow()
+            })
+        })
+    })
+
+    describe('Game Simulation', () => {
+        let player1: { id: string, color: Color }
+        let player2: { id: string, color: Color }
+
+        beforeEach(() => {
+            const p1 = gameEngine.addPlayer()
+            const p2 = gameEngine.addPlayer()
+            player1 = { id: p1.id, color: p1.color }
+            player2 = { id: p2.id, color: p2.color }
+        })
+
+        it('should move an ant according to its rule on a white tile', () => {
+            gameEngine.placeAnt(player1.id, { x: 10, y: 10 }, [RULE_R])
+            gameEngine.tick()
+            expect(gameEngine.getState().ants[0].position).toEqual({ x: 11, y: 10 })
+            expect(gameEngine.getState().ants[0].direction).toBe('RIGHT')
+            expect(gameEngine.getGameStateSnapshot().cells.get('10,10')).toBe(player1.color)
+            gameEngine.tick()
+            expect(gameEngine.getState().ants[0].position).toEqual({ x: 11, y: 11 })
+            expect(gameEngine.getState().ants[0].direction).toBe('DOWN')
+            expect(gameEngine.getGameStateSnapshot().cells.get('11,10')).toBe(player1.color)
+        })
+
+        it('should move an ant and flip its own tile back to white', () => {
+            const rule: Rule = { cellColor: player1.color, turnDirection: 'LEFT' }
+            gameEngine.placeAnt(player1.id, { x: 10, y: 10 }, [rule])
+            gameEngine.flipTile(player1.id, { x: 10, y: 10 })
+            gameEngine.tick()
+            const state = gameEngine.getState()
+            const ant = state.ants[0]
+            const snapshot = gameEngine.getGameStateSnapshot()
+            expect(ant.position).toEqual({ x: 9, y: 10 })
+            expect(ant.direction).toBe('LEFT')
+            expect(snapshot.cells.get('10,10')).toBe(COLOR_WHITE)
+            expect(snapshot.ants[0].position).toEqual({ x: 9, y: 10 })
+            expect(snapshot.ants[0].direction).toBe('LEFT')
+        })
+
+        it("should treat another player's tile as white", () => {
+            gameEngine.placeAnt(player1.id, { x: 10, y: 10 }, [RULE_R])
+            gameEngine.flipTile(player2.id, { x: 10, y: 10 })
+            const originalTileColor = gameEngine.getCellColor({ x: 10, y: 10 })
+            gameEngine.tick()
+            const ant = gameEngine.getState().ants[0]
+            expect(ant.position).toEqual({ x: 11, y: 10 })
+            expect(ant.direction).toBe('RIGHT')
+            expect(gameEngine.getState().grid.cells.get('10,10')).toBe(player1.color)
+        })
+
+        it('default rules should be applied if no rule matches', () => {
+            const rule: Rule = { cellColor: '#FF0000', turnDirection: 'LEFT' }
+            gameEngine.placeAnt(player1.id, { x: 10, y: 10 }, [rule]) // default white rule should be applied (turn LEFT)
+            gameEngine.tick()
+            const ant = gameEngine.getState().ants[0]
+            const snapshot = gameEngine.getGameStateSnapshot()
+            expect(ant.position).toEqual({ x: 9, y: 10 })
+            expect(ant.direction).toBe('LEFT')
+            expect(snapshot.cells.size).toBe(1)
+            expect(snapshot.cells.get('10,10')).toBe(ant.color)
+        })
+
+        it('should handle collisions correctly', () => {
+            const player3 = gameEngine.addPlayer()
+            gameEngine.placeAnt(player1.id, { x: 10, y: 10 }, [RULE_R])
+            gameEngine.placeAnt(player2.id, { x: 12, y: 10 }, [RULE_L])
+            gameEngine.tick()
+            const ants = gameEngine.getState().ants
+            const ant1 = ants.find(a => a.id === gameEngine.getState().players.get(player1.id)?.antId)!
+            const ant2 = ants.find(a => a.id === gameEngine.getState().players.get(player2.id)?.antId)!
+            expect(ant1.position).toEqual({ x: 11, y: 10 })
+            expect(ant1.direction).toBe('RIGHT')
+            expect(ant2.position).toEqual({ x: 12, y: 10 })
+            expect(ant2.direction).toBe('UP')
+            expect(gameEngine.getGameStateSnapshot().cells.has('12,10')).toBe(false)
+            expect(gameEngine.getGameStateSnapshot().cells.has('11,9')).toBe(false)
+        })
+    })
+
+    describe('Grid and State Management', () => {
+        let player: { id: string, color: Color }
+
+        beforeEach(() => {
+            const p = gameEngine.addPlayer()
+            player = { id: p.id, color: p.color }
+        })
+
+        describe('flipTile', () => {
+            it('should allow a player to flip a white tile to their color', () => {
+                gameEngine.flipTile(player.id, { x: 5, y: 5 })
+                expect(gameEngine.getState().grid.cells.get('5,5')).toBe(player.color)
+                expect(gameEngine.getGameStateSnapshot().cells.get('5,5')).toBe(player.color)
+            })
+
+            it('should allow a player to flip their own tile back to white', () => {
+                gameEngine.flipTile(player.id, { x: 5, y: 5 })
+                gameEngine.flipTile(player.id, { x: 5, y: 5 })
+                expect(gameEngine.getState().grid.cells.get('5,5')).toBe(COLOR_WHITE)
+                expect(gameEngine.getGameStateSnapshot().cells.get('5,5')).toBe(COLOR_WHITE)
+            })
+
+            it("should throw an error when trying to flip another player's tile", () => {
+                const player2 = gameEngine.addPlayer()
+                gameEngine.flipTile(player2.id, { x: 5, y: 5 })
+                expect(() => gameEngine.flipTile(player.id, { x: 5, y: 5 })).toThrow('Tile is colored by another player')
+            })
+        })
+
+        describe('getGameStateSnapshot', () => {
+            it('should only contain cells that changed during the tick', () => {
+                gameEngine.placeAnt(player.id, { x: 1, y: 1 }, [RULE_R])
+                gameEngine.flipTile(player.id, { x: 99, y: 99 }) 
+                gameEngine.tick()
+
+                const snapshot = gameEngine.getGameStateSnapshot()
+                expect(snapshot.cells.size).toBe(1)
+                expect(snapshot.cells.has('1,1')).toBe(true)
+            })
+
+            it('should be empty if no state changed', () => {
+                gameEngine.tick()
+                const snapshot = gameEngine.getGameStateSnapshot()
+                expect(snapshot.cells.size).toBe(0)
+            })
+
+            it('should contain all ants with their updated states', () => {
+                gameEngine.placeAnt(player.id, { x: 1, y: 1 }, [RULE_R])
+                gameEngine.tick()
+                const snapshot = gameEngine.getGameStateSnapshot()
+                expect(snapshot.ants.length).toBe(1)
+                expect(snapshot.ants[0].position).toEqual({ x: 2, y: 1 })
+            })
+        })
+    })
+}) 
