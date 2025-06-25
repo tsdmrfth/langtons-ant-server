@@ -296,6 +296,15 @@ describe('GameEngine', () => {
             expect(tickUpdate.cells.size).toBe(1)
             expect(tickUpdate.cells.get('11,10')).toBe(player2.color)
         })
+
+        it('should delete a tiles colored with white', () => {
+            gameEngine.placeAnt(player1.id, { x: 10, y: 10 }, [RULE_R])
+            gameEngine.tick()
+            expect(gameEngine.getState().grid.cells.has('10,10')).toBe(true)
+            gameEngine.flipTile(player1.id, { x: 10, y: 10 })
+            const cells = gameEngine.getState().grid.cells
+            expect(Object.values(cells).every(color => color !== COLOR_WHITE)).toBe(true)
+        })
     })
 
     describe('Grid and State Management', () => {

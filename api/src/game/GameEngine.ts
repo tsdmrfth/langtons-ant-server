@@ -229,7 +229,12 @@ export class GameEngine {
 
   private updateCell(position: Position, color: Color): void {
     const cellKey = this.getCellKey(position)
-    this.state.grid.cells.set(cellKey, color)
+
+    if (color === COLOR_WHITE) {
+      this.state.grid.cells.delete(cellKey)
+    } else {
+      this.state.grid.cells.set(cellKey, color)
+    }
   }
 
   private removeAnt(antId: string): void {
