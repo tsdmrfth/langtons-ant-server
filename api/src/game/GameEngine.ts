@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid'
-import { Ant, Color, Direction, GameConfig, GameState, GameStateSnapshot, Player, Position, Rule } from '../types/game'
+import { Ant, Color, Direction, GameConfig, GameState, GameTickUpdate, Player, Position, Rule } from '../types/game'
 import { moveAnt, turnAnt } from '../utils/antHelpers'
 import { COLOR_WHITE } from '../config'
 
@@ -14,18 +14,6 @@ export class GameEngine {
       grid: {
         width: config.gridWidth,
         height: config.gridHeight,
-        cells: new Map()
-      },
-      ants: [],
-      players: new Map()
-    }
-  }
-
-  public reset(): void {
-    this.state = {
-      grid: {
-        width: this.config.gridWidth,
-        height: this.config.gridHeight,
         cells: new Map()
       },
       ants: [],
@@ -49,7 +37,7 @@ export class GameEngine {
     return player
   }
 
-  public removePlayer(playerId: string): { clearedCells: Map<string, Color>, antId: string | null } {
+  public removePlayer(playerId: string): { clearedCells: Map<string, Color> } {
     const player = this.state.players.get(playerId)
 
     if (!player) {
@@ -71,10 +59,10 @@ export class GameEngine {
     }
 
     this.state.players.delete(playerId)
-    return { clearedCells, antId }
+    return { clearedCells }
   }
 
-  public placeAnt(playerId: string, position: Position, rules?: Rule[], direction: Direction = 'UP',): Ant {
+  public placeAnt(playerId: string, position: Position, rules?: Rule[], direction: Direction = 'UP'): Ant {
     const player = this.state.players.get(playerId)
 
     if (!player) {
@@ -93,6 +81,11 @@ export class GameEngine {
       throw new Error('Position out of bounds')
     }
 
+    if (typeof position.x !== 'number' || typeof position.y !== 'number' ||
+      !Number.isInteger(position.x) || !Number.isInteger(position.y)) {
+      throw new Error('Position coordinates must be integers')
+    }
+
     const existingAnt = this.state.ants.find(ant =>
       ant.position.x === position.x && ant.position.y === position.y
     )
@@ -101,20 +94,23 @@ export class GameEngine {
       throw new Error('An ant already exists at this position')
     }
 
+    let finalRules: Rule[]
+
     if (rules && rules.length > 0) {
       this.validateRules(rules)
+      finalRules = [...rules]
 
-      if (!this.doesIncludeMandatoryRules(rules, player.color)) {
-        if (!rules.find(rule => rule.cellColor === COLOR_WHITE)) {
-          rules.push({ cellColor: COLOR_WHITE, turnDirection: 'LEFT' })
+      if (!this.doesIncludeMandatoryRules(finalRules, player.color)) {
+        if (!finalRules.find(rule => rule.cellColor === COLOR_WHITE)) {
+          finalRules.push({ cellColor: COLOR_WHITE, turnDirection: 'LEFT' })
         }
 
-        if (!rules.find(rule => rule.cellColor === player.color)) {
-          rules.push({ cellColor: player.color, turnDirection: 'RIGHT' })
+        if (!finalRules.find(rule => rule.cellColor === player.color)) {
+          finalRules.push({ cellColor: player.color, turnDirection: 'RIGHT' })
         }
       }
     } else {
-      rules = [
+      finalRules = [
         { cellColor: COLOR_WHITE, turnDirection: 'LEFT' },
         { cellColor: player.color, turnDirection: 'RIGHT' }
       ]
@@ -125,7 +121,7 @@ export class GameEngine {
       position,
       direction,
       color: player.color,
-      rules
+      rules: finalRules
     }
     this.state.ants.push(ant)
     player.antId = ant.id
@@ -164,6 +160,10 @@ export class GameEngine {
         throw new Error('Invalid rule format: cellColor and turnDirection are required')
       }
 
+      if (typeof rule.cellColor !== 'string' || rule.cellColor.trim() === '') {
+        throw new Error('Invalid cell color: cellColor must be a non-empty string')
+      }
+
       if (!['LEFT', 'RIGHT'].includes(rule.turnDirection)) {
         throw new Error('Invalid turn direction: turnDirection must be LEFT or RIGHT')
       }
@@ -181,13 +181,19 @@ export class GameEngine {
   }
 
   private doesIncludeMandatoryRules(rules: Rule[], antColor: Color): boolean {
-    return rules.filter(rule => rule.cellColor === antColor || rule.cellColor === COLOR_WHITE).length === 2
+    const whiteRule = rules.find(rule => rule.cellColor === COLOR_WHITE)
+    const colorRule = rules.find(rule => rule.cellColor === antColor)
+    return whiteRule !== undefined && colorRule !== undefined &&
+      ['LEFT', 'RIGHT'].includes(whiteRule.turnDirection) &&
+      ['LEFT', 'RIGHT'].includes(colorRule.turnDirection)
   }
 
   public tick(): void {
     this.changedCells.clear()
     const newAnts: Ant[] = []
-    const occupiedPositions = new Map<string, Ant>()
+    const occupiedPositions: Map<string, Ant> = new Map(this.state.ants.map(ant => {
+      return [this.getCellKey(ant.position), ant]
+    }))
 
     for (const ant of this.state.ants) {
       const result = this.processAnt(ant, occupiedPositions)
@@ -264,7 +270,7 @@ export class GameEngine {
     return this.state.grid.cells.get(cellKey) || COLOR_WHITE
   }
 
-  public flipTile(playerId: string, position: Position) {
+  public flipTile(playerId: string, position: Position): Map<string, Color> {
     const player = this.state.players.get(playerId)
 
     if (!player) {
@@ -276,29 +282,34 @@ export class GameEngine {
     if (currentColor === COLOR_WHITE) {
       this.updateCell(position, player.color)
       this.changedCells.set(this.getCellKey(position), player.color)
-      return
+      return this.changedCells
     }
 
     if (currentColor === player.color) {
       this.updateCell(position, COLOR_WHITE)
       this.changedCells.set(this.getCellKey(position), COLOR_WHITE)
-      return
+      return this.changedCells
     }
 
     throw new Error('Tile is colored by another player')
   }
 
-  public getFullState(): GameStateSnapshot {
+  public getTickUpdate(): GameTickUpdate {
     return {
-      cells: this.state.grid.cells,
+      cells: this.changedCells,
       ants: this.state.ants
     }
   }
 
-  public getGameStateSnapshot(): GameStateSnapshot {
-    return {
-      cells: this.changedCells,
-      ants: this.state.ants
+  public reset(): void {
+    this.state = {
+      grid: {
+        width: this.config.gridWidth,
+        height: this.config.gridHeight,
+        cells: new Map()
+      },
+      ants: [],
+      players: new Map()
     }
   }
 }

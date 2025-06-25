@@ -44,10 +44,18 @@ export interface GameConfig {
   tickInterval: number
   maxPlayers: number
   heartbeatInterval: number
+  rateLimitWindowMs: number
+  maxMessagesPerWindow: number
+  gridChunkSize: number
 }
 
-export interface GameStateSnapshot {
+export interface GameTickUpdate {
   cells: Map<string, Color>
+  ants: Ant[]
+}
+
+export interface GameTickUpdatePayload {
+  cells: Record<string, Color>
   ants: Ant[]
 }
 
@@ -69,6 +77,7 @@ export interface PlaceAntPayload {
 export interface PlaceAntResponsePayload {
   cells: Record<string, Color>
   ant: Ant
+  playerId: string
 }
 
 export interface RuleChangePayload {
@@ -86,6 +95,7 @@ export interface TileFlipPayload {
 
 export interface TileFlipResponsePayload {
   cells: Record<string, Color>
+  playerId: string
 }
 
 export interface ErrorPayload {
@@ -94,20 +104,36 @@ export interface ErrorPayload {
 
 export interface WelcomeMessagePayload {
   player: Player
-  gameState: GameStateSnapshotPayload
+  state: {
+    ants: Ant[]
+    grid: {
+      width: number
+      height: number
+      cells: Record<string, Color>
+    }
+  }
 }
 
-export interface GameStateSnapshotPayload {
+export interface GridChunkPayload {
+  chunk: number
+  total: number
   cells: Record<string, Color>
-  ants: Ant[]
 }
 
-export type WebSocketMessage =
+export type IncomingMessage =
+  | { type: 'PLACE_ANT'; payload: PlaceAntPayload }
+  | { type: 'CHANGE_RULES'; payload: RuleChangePayload }
+  | { type: 'FLIP_TILE'; payload: TileFlipPayload }
+
+export type OutgoingMessage =
+  | { type: 'GAME_TICK_UPDATE'; payload: GameTickUpdatePayload }
   | { type: 'WELCOME'; payload: WelcomeMessagePayload }
-  | { type: 'GAME_STATE_SNAPSHOT'; payload: GameStateSnapshotPayload }
-  | { type: 'PLAYER_JOIN'; payload: PlayerJoinPayload }
-  | { type: 'PLAYER_LEAVE'; payload: PlayerLeavePayload }
-  | { type: 'PLACE_ANT'; payload: PlaceAntPayload | PlaceAntResponsePayload }
-  | { type: 'RULE_CHANGE'; payload: RuleChangePayload | RuleChangeResponsePayload }
-  | { type: 'TILE_FLIP'; payload: TileFlipPayload | TileFlipResponsePayload }
+  | { type: 'PLAYER_JOINED'; payload: PlayerJoinPayload }
+  | { type: 'PLAYER_LEFT'; payload: PlayerLeavePayload }
+  | { type: 'ANT_PLACED'; payload: PlaceAntResponsePayload }
+  | { type: 'RULES_CHANGED'; payload: RuleChangeResponsePayload }
+  | { type: 'TILE_FLIPPED'; payload: TileFlipResponsePayload }
+  | { type: 'GRID_CHUNK'; payload: GridChunkPayload }
   | { type: 'ERROR'; payload: ErrorPayload }
+
+export type WebSocketMessage = IncomingMessage | OutgoingMessage

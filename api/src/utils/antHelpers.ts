@@ -2,9 +2,10 @@ import { Direction, Position } from '../types/game'
 
 export function turnAnt(current: Direction, turn: 'LEFT' | 'RIGHT'): Direction {
   const directions: Direction[] = ['UP', 'RIGHT', 'DOWN', 'LEFT']
-  const idx = directions.indexOf(current)
-  const delta = turn === 'LEFT' ? -1 : 1
-  return directions[(idx + delta + directions.length) % directions.length]
+  const currentIndex = directions.indexOf(current)
+  const turnValue = turn === 'LEFT' ? -1 : 1
+  const newIndex = (currentIndex + turnValue + directions.length) % directions.length
+  return directions[newIndex]
 }
 
 export function moveAnt(position: Position, direction: Direction, gridWidth: number, gridHeight: number): Position {
@@ -26,4 +27,4 @@ export function moveAnt(position: Position, direction: Direction, gridWidth: num
   }
 
   return next
-} 
+}

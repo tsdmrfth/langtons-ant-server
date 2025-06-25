@@ -36,5 +36,23 @@ describe('antHelpers', () => {
             const pos: Position = { x: 9, y: 5 }
             expect(moveAnt(pos, 'RIGHT', gridWidth, gridHeight)).toEqual({ x: 0, y: 5 })
         })
+
+        it('moves down with wrapping', () => {
+            const pos: Position = { x: 5, y: 9 }
+            expect(moveAnt(pos, 'DOWN', gridWidth, gridHeight)).toEqual({ x: 5, y: 0 })
+        })
+
+        it('moves left with wrapping', () => {
+            const pos: Position = { x: 0, y: 5 }
+            expect(moveAnt(pos, 'LEFT', gridWidth, gridHeight)).toEqual({ x: 9, y: 5 })
+        })
+
+        it('handles normal movement without wrapping', () => {
+            const pos: Position = { x: 5, y: 5 }
+            expect(moveAnt(pos, 'UP', gridWidth, gridHeight)).toEqual({ x: 5, y: 4 })
+            expect(moveAnt(pos, 'RIGHT', gridWidth, gridHeight)).toEqual({ x: 6, y: 5 })
+            expect(moveAnt(pos, 'DOWN', gridWidth, gridHeight)).toEqual({ x: 5, y: 6 })
+            expect(moveAnt(pos, 'LEFT', gridWidth, gridHeight)).toEqual({ x: 4, y: 5 })
+        })
     })
-}) 
+})

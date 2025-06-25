@@ -1,15 +1,18 @@
 import http from 'http'
 import WebSocket from 'ws'
-import { WebSocketServer } from './WebSocketServer'
 import { GameConfig, Rule } from '../types/game'
+import { WebSocketServer } from './WebSocketServer'
 
 describe('WebSocketServer', () => {
   const gameConfig: GameConfig = {
-    gridWidth: 50,
-    gridHeight: 50,
-    tickInterval: 250,
+    gridWidth: 100,
+    gridHeight: 100,
+    tickInterval: 100,
     maxPlayers: 10,
-    heartbeatInterval: 100
+    heartbeatInterval: 1000,
+    rateLimitWindowMs: 1000,
+    maxMessagesPerWindow: 10,
+    gridChunkSize: 100
   }
   let httpServer: http.Server
   let wss: WebSocketServer
@@ -37,12 +40,12 @@ describe('WebSocketServer', () => {
 
   const createClient = () => new WebSocket(`ws://localhost:${port}`)
 
-  it('broadcasts PLAYER_JOIN when a client connects', done => {
+  it('broadcasts PLAYER_JOINED when a client connects', done => {
     const client = createClient()
 
     client.on('message', data => {
       const message = JSON.parse(data.toString())
-      if (message.type === 'PLAYER_JOIN') {
+      if (message.type === 'PLAYER_JOINED') {
         expect(message.payload).toHaveProperty('playerId')
         expect(message.payload).toHaveProperty('color')
         client.close()
@@ -51,7 +54,7 @@ describe('WebSocketServer', () => {
     })
   })
 
-  it('broadcasts PLACE_ANT to all clients', done => {
+  it('broadcasts ANT_PLACED to all clients', done => {
     const clientA = createClient()
     const clientB = createClient()
     const rules: Rule[] = [{ cellColor: '#FFFFFF', turnDirection: 'RIGHT' }]
@@ -75,7 +78,7 @@ describe('WebSocketServer', () => {
     clientB.once('message', () => checkReady())
     clientB.on('message', data => {
       const message = JSON.parse(data.toString())
-      if (message.type === 'PLACE_ANT') {
+      if (message.type === 'ANT_PLACED') {
         expect(message.payload).toHaveProperty('cells')
         expect(message.payload).toHaveProperty('ant')
         clientA.close()
@@ -85,7 +88,7 @@ describe('WebSocketServer', () => {
     })
   })
 
-  it('broadcasts RULE_CHANGE updates', done => {
+  it('broadcasts RULES_CHANGED updates', done => {
     const client = createClient()
     const rules: Rule[] = [{ cellColor: '#FFFFFF', turnDirection: 'LEFT' }]
 
@@ -94,7 +97,7 @@ describe('WebSocketServer', () => {
     client.on('message', data => {
       const message = JSON.parse(data.toString())
 
-      if (message.type === 'PLAYER_JOIN') {
+      if (message.type === 'PLAYER_JOINED') {
         playerId = message.payload.playerId
         const antPlace = {
           type: 'PLACE_ANT',
@@ -106,15 +109,15 @@ describe('WebSocketServer', () => {
         client.send(JSON.stringify(antPlace))
       }
 
-      if (message.type === 'PLACE_ANT') {
+      if (message.type === 'ANT_PLACED') {
         const ruleChange = {
-          type: 'RULE_CHANGE',
+          type: 'CHANGE_RULES',
           payload: { rules }
         }
         client.send(JSON.stringify(ruleChange))
       }
 
-      if (message.type === 'RULE_CHANGE') {
+      if (message.type === 'RULES_CHANGED') {
         expect(message.payload.playerId).toBe(playerId)
         expect(message.payload.rules).toEqual(rules)
         client.close()
@@ -123,7 +126,7 @@ describe('WebSocketServer', () => {
     })
   })
 
-  it('broadcasts TILE_FLIP snapshots', done => {
+  it('broadcasts TILE_FLIPPED snapshots', done => {
     const client = createClient()
 
     const rules: Rule[] = [{ cellColor: '#FFFFFF', turnDirection: 'RIGHT' }]
@@ -139,7 +142,7 @@ describe('WebSocketServer', () => {
     client.on('message', data => {
       const message = JSON.parse(data.toString())
 
-      if (phase === Phase.Joined && message.type === 'PLAYER_JOIN') {
+      if (phase === Phase.Joined && message.type === 'PLAYER_JOINED') {
         const antPlace = {
           type: 'PLACE_ANT',
           payload: { position: { x: 2, y: 2 }, rules }
@@ -149,9 +152,9 @@ describe('WebSocketServer', () => {
         return
       }
 
-      if (phase === Phase.Placed && message.type === 'PLACE_ANT') {
+      if (phase === Phase.Placed && message.type === 'ANT_PLACED') {
         const flip = {
-          type: 'TILE_FLIP',
+          type: 'FLIP_TILE',
           payload: { position: { x: 3, y: 3 } }
         }
         client.send(JSON.stringify(flip))
@@ -159,7 +162,7 @@ describe('WebSocketServer', () => {
         return
       }
 
-      if (phase === Phase.Flipped && message.type === 'TILE_FLIP') {
+      if (phase === Phase.Flipped && message.type === 'TILE_FLIPPED') {
         expect(message.payload).toHaveProperty('cells')
         client.close()
         done()
@@ -206,7 +209,7 @@ describe('WebSocketServer', () => {
       const floodMessages = () => {
         for (let i = 0; i < 31; i++) {
           const payload = {
-            type: 'RULE_CHANGE',
+            type: 'CHANGE_RULES',
             payload: { rules }
           }
           client.send(JSON.stringify(payload))
@@ -216,7 +219,7 @@ describe('WebSocketServer', () => {
       client.on('message', data => {
         const message = JSON.parse(data.toString())
 
-        if (message.type === 'PLAYER_JOIN') {
+        if (message.type === 'PLAYER_JOINED') {
           floodMessages()
         }
 
@@ -246,7 +249,7 @@ describe('WebSocketServer', () => {
       client.on('message', data => {
         const message = JSON.parse(data.toString())
 
-        if (message.type === 'PLAYER_JOIN') {
+        if (message.type === 'PLAYER_JOINED') {
           client.send(JSON.stringify({ payload: {} }))
           return
         }
@@ -270,7 +273,7 @@ describe('WebSocketServer', () => {
       client.on('message', data => {
         const message = JSON.parse(data.toString())
 
-        if (message.type === 'PLAYER_JOIN') {
+        if (message.type === 'PLAYER_JOINED') {
           const invalid = { type: 'UNKNOWN_TYPE', payload: {} }
           client.send(JSON.stringify(invalid))
           return
@@ -295,7 +298,7 @@ describe('WebSocketServer', () => {
       client.on('message', data => {
         const message = JSON.parse(data.toString())
 
-        if (message.type === 'PLAYER_JOIN') {
+        if (message.type === 'PLAYER_JOINED') {
           client.send(JSON.stringify({ type: 'PLACE_ANT' }))
           return
         }

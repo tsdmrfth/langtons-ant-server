@@ -2,11 +2,11 @@
 
 ## Description
 Langton's Ant is a two-dimensional cellular automaton with simple local rules that produce complex global behaviour.  
-This repository contains a **multiplayer, real-time, browser-based** implementation where every connected player controls an individual ant with a unique colour and rule-set.  The service consists of:
+This repository contains a **multiplayer, real-time, browser-based** implementation where every connected player controls an individual ant with a unique colour and rule-set. The service consists of:
 
 * **api/** – a Node + TypeScript WebSocket server responsible for game state, tick processing, validation and broadcasting.
   - For a complete description of all public classes, methods and message schemas see [API_REFERENCE.md](./api/API_REFERENCE.md).
-* **client/** – a React/Expo web application that renders the shared grid, lets the player define rules, place an ant, and interact with tiles.
+* **client/** – a React web application that renders the shared grid, lets the player define rules, place an ant, and interact with tiles.
 
 The server maintains a single authoritative grid; clients receive incremental snapshots every 250 ms and render only the changed chunks for performance.
 
@@ -27,7 +27,7 @@ yarn install
 ```
 
 #### 2 — Run the server (dev mode)
-Make sure youre in api folder
+Make sure you're in api folder
 
 ```bash
 cd api
@@ -39,7 +39,7 @@ yarn dev
 ```
 
 #### 3 — Run unit tests
-Make sure youre in api folder
+Make sure you're in api folder
 
 ```bash
 cd api
@@ -60,7 +60,7 @@ yarn test
 | **Language** | TypeScript with `strict: true` for reliability and editor tooling |
 | **WebSocket library** | [`ws`](https://github.com/websockets/ws) – minimal, battle-tested, no HTTP server opinion |
 | **State model** | `GameEngine` class keeps all grid data in memory for ultra-low latency; grid is a `Map` keyed by `x,y` and sharded into fixed-size chunks to minimise diff payloads |
-| **Collision policy** | During a tick, ants are processed in player-join order; if two ants attempt the same cell, the first ant moves, the others stay.  This keeps determinism but is biased – Randomised ordering or hashed fairness could be added as a future improvement..  |
+| **Collision policy** | During a tick, ants are processed in player-join order; if two ants attempt the same cell, the first ant moves, the others stay. This keeps determinism but is biased – Randomised ordering or hashed fairness could be added as a future improvement. |
 | **Colour allocation** | Random RGB excluding already-used values; guarantees uniqueness. |
 | **Testing** | Jest unit tests for all game logic and WebSocket contract; CI step aborts on failure. |
 | **Performance** | `permessage-deflate` is enabled in the WS handshake which cuts average snapshot payload size in local profiling and boosts ops/sec at shorter tick intervals. |
@@ -77,25 +77,27 @@ Pipeline outline
 5. Build the TypeScript sources via `yarn build:server`
 6. Execute the Jest test suite with `yarn test`
 
-All steps run from the `api` sub-directory to keep the mono-repo future-proof.  The workflow fails fast on type errors or failing tests, ensuring main is always deployable.
+All steps run from the `api` sub-directory to keep the mono-repo future-proof. The workflow fails fast on type errors or failing tests, ensuring main is always deployable.
 
 ---
 ## Trade-offs 
-* **Colour continuity:** when a player disconnects, their colour is returned to the available pool.  If they reconnect they will be treated as a new player and may receive a different colour – the implementation keeps the server stateless and avoids reserving colours indefinitely.
+* **Colour continuity:** when a player disconnects, their colour is returned to the available pool. If they reconnect they will be treated as a new player and may receive a different colour – the implementation keeps the server stateless and avoids reserving colours indefinitely.
 * **Fairness:** current collision resolution favours earlier ants.
+* **Performance vs Memory:** In-memory grid storage provides ultra-low latency but limits scalability for very large grids.
 
 ---
 ## Future Work
 With more time, I would have liked to implement and test the following:
-- Offload tick processing to worker threads to maintain WebSocket event loop responsiveness for larger grids.
+- Implement player session persistence for reconnection handling
+- Offload tick processing to worker threads to maintain WebSocket event loop responsiveness for larger grids
 - Partition the grid across shards and broadcast merged diffs for larger loads (e.g. 10k×10k grid with 160 players)
-- Add a Redis layer plus periodic snapshots to enable restarts and historical replay.
-- Add a deployment script to deploy the server to a cloud provider.
-- Add support for other languages.
+- Add a Redis layer plus periodic snapshots to enable restarts and historical replay
+- Add a deployment script to deploy the server to a cloud provider
+- Add support for other languages
 - A full React front-end:
-  - Canvas-based grid renderer that repaints only the diffed chunks received in each `GAME_STATE_SNAPSHOT` message
-  - Rule-editor form with client-side validation and live preview, syncing changes via `RULE_CHANGE`
-  - Click/touch interactions for ant placement (`PLACE_ANT`) and tile flip (`TILE_FLIP`)
+  - Canvas-based grid renderer that repaints only the diffed chunks received in each `GAME_TICK_UPDATE` message
+  - Rule-editor form with client-side validation and live preview, syncing changes via `CHANGE_RULES`
+  - Click/touch interactions for ant placement (`PLACE_ANT`) and tile flip (`FLIP_TILE`)
   - Reconnect logic with exponential back-off and token reuse so players retain colour and ant
   - Responsive layout with Tailwind CSS
 
@@ -105,6 +107,8 @@ The following numbers were produced on an Apple M2 Pro using the provided benchm
 
 - Higher Ops/Sec = faster
 - Lower Heap MB = less memory
+
+### main branch
 
 | Grid (NxN) | Players | Ops / Sec | Heap MB |
 |------------|---------|-----------|---------|
@@ -143,4 +147,18 @@ Run it yourself:
 ```bash
 cd api
 yarn benchmark
+```
+
+---
+## Testing
+The project includes comprehensive test coverage with 51 passing tests across:
+- Game engine logic and state management
+- WebSocket message handling and validation
+- Ant movement and collision detection
+- Player management and rule validation
+
+Run tests with:
+```bash
+cd api
+yarn test
 ```

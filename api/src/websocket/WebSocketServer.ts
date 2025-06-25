@@ -2,24 +2,25 @@ import { Server } from 'http'
 import { RawData, WebSocket, WebSocketServer as WSServer } from 'ws'
 import { GameEngine } from '../game/GameEngine'
 import {
+  Color,
   ErrorPayload,
   GameConfig,
-  GameStateSnapshot,
+  GameTickUpdate,
+  IncomingMessage,
+  OutgoingMessage,
   PlaceAntPayload,
   PlaceAntResponsePayload,
   RuleChangePayload,
   RuleChangeResponsePayload,
   TileFlipPayload,
-  TileFlipResponsePayload,
-  WebSocketMessage
+  TileFlipResponsePayload
 } from '../types/game'
+import logger from '../utils/logger'
 
-const RATE_LIMIT_WINDOW_MS = 1000
-const MAX_MESSAGES_PER_WINDOW = 30
 const VALID_INCOMING_MESSAGE_TYPES = [
   'PLACE_ANT',
-  'RULE_CHANGE',
-  'TILE_FLIP',
+  'CHANGE_RULES',
+  'FLIP_TILE',
 ]
 
 export class WebSocketServer {
@@ -63,20 +64,28 @@ export class WebSocketServer {
         socket.isAlive = true
         socket.playerId = player.id
         this.clients.set(player.id, socket)
-        const fullState = this.gameEngine.getFullState()
+        const fullState = this.gameEngine.getState()
         this.sendToClient(socket, {
           type: 'WELCOME',
           payload: {
             player,
-            gameState: {
+            state: {
               ants: fullState.ants,
-              cells: Object.fromEntries(fullState.cells)
-            }
-          }
+              grid: {
+                width: fullState.grid.width,
+                height: fullState.grid.height,
+                cells: {},
+              },
+            },
+          },
         })
 
+        if (fullState.grid.cells.size > 0) {
+          this.sendGridInChunks(socket, fullState.grid.cells)
+        }
+
         this.broadcastGameState({
-          type: 'PLAYER_JOIN',
+          type: 'PLAYER_JOINED',
           payload: { playerId: player.id, color: player.color }
         })
         socket.on('message', (data: RawData) => {
@@ -86,7 +95,14 @@ export class WebSocketServer {
           }
 
           const raw = typeof data === 'string' ? data : data.toString()
-          const message: WebSocketMessage = JSON.parse(raw)
+          let message: IncomingMessage
+
+          try {
+            message = JSON.parse(raw)
+          } catch (error) {
+            this.handleError(socket, new Error('Invalid JSON format'))
+            return
+          }
 
           try {
             this.validateMessage(message)
@@ -137,7 +153,7 @@ export class WebSocketServer {
     this.startGameLoop()
   }
 
-  private validateMessage(message: WebSocketMessage): void {
+  private validateMessage(message: IncomingMessage): void {
     if (!message.type) {
       throw new Error('Invalid message format: missing type')
     }
@@ -151,11 +167,10 @@ export class WebSocketServer {
     }
   }
 
-  private handleMessage(playerId: string, incomingMessage: WebSocketMessage): void {
+  private handleMessage(playerId: string, incomingMessage: IncomingMessage): void {
     const client = this.clients.get(playerId)
 
     if (!client) {
-      console.error('No active client for player:', playerId)
       return
     }
 
@@ -163,10 +178,10 @@ export class WebSocketServer {
       case 'PLACE_ANT':
         this.handlePlaceAntMessage(client, playerId, incomingMessage)
         break
-      case 'RULE_CHANGE':
+      case 'CHANGE_RULES':
         this.handleRuleChangeMessage(client, playerId, incomingMessage)
         break
-      case 'TILE_FLIP':
+      case 'FLIP_TILE':
         this.handleTileFlipMessage(client, playerId, incomingMessage)
         break
       default:
@@ -174,17 +189,18 @@ export class WebSocketServer {
     }
   }
 
-  private handlePlaceAntMessage(client: WebSocket, playerId: string, incomingMessage: WebSocketMessage): void {
+  private handlePlaceAntMessage(client: WebSocket, playerId: string, incomingMessage: IncomingMessage): void {
     const { position, rules } = incomingMessage.payload as PlaceAntPayload
     try {
       const ant = this.gameEngine.placeAnt(playerId, position, rules)
-      const snapshot = this.gameEngine.getGameStateSnapshot()
+      const tickUpdate = this.gameEngine.getTickUpdate()
       const responsePayload: PlaceAntResponsePayload = {
         ant,
-        cells: Object.fromEntries(snapshot.cells)
+        playerId,
+        cells: Object.fromEntries(tickUpdate.cells)
       }
       this.broadcastGameState({
-        type: 'PLACE_ANT',
+        type: 'ANT_PLACED',
         payload: responsePayload
       })
     } catch (error) {
@@ -192,7 +208,7 @@ export class WebSocketServer {
     }
   }
 
-  private handleRuleChangeMessage(client: WebSocket, playerId: string, incomingMessage: WebSocketMessage): void {
+  private handleRuleChangeMessage(client: WebSocket, playerId: string, incomingMessage: IncomingMessage): void {
     const { rules } = incomingMessage.payload as RuleChangePayload
     try {
       this.gameEngine.updateRules(playerId, rules)
@@ -201,7 +217,7 @@ export class WebSocketServer {
         rules
       }
       this.broadcastGameState({
-        type: 'RULE_CHANGE',
+        type: 'RULES_CHANGED',
         payload: responsePayload
       })
     } catch (error) {
@@ -209,16 +225,16 @@ export class WebSocketServer {
     }
   }
 
-  private handleTileFlipMessage(client: WebSocket, playerId: string, incomingMessage: WebSocketMessage): void {
+  private handleTileFlipMessage(client: WebSocket, playerId: string, incomingMessage: IncomingMessage): void {
     const { position } = incomingMessage.payload as TileFlipPayload
     try {
-      this.gameEngine.flipTile(playerId, position)
-      const snapshot = this.gameEngine.getGameStateSnapshot()
+      const changedCells = this.gameEngine.flipTile(playerId, position)
       const responsePayload: TileFlipResponsePayload = {
-        cells: Object.fromEntries(snapshot.cells)
+        cells: Object.fromEntries(changedCells),
+        playerId,
       }
       this.broadcastGameState({
-        type: 'TILE_FLIP',
+        type: 'TILE_FLIPPED',
         payload: responsePayload
       })
     } catch (error) {
@@ -227,96 +243,161 @@ export class WebSocketServer {
   }
 
   private handleDisconnect(playerId: string): void {
+    let clearedCells: Map<string, Color> = new Map()
     try {
-      const { clearedCells, antId } = this.gameEngine.removePlayer(playerId)
-      this.clients.delete(playerId)
+      clearedCells = this.gameEngine.removePlayer(playerId).clearedCells
+    } catch (error) {
+      // No player found, ignore
+      return
+    }
 
-      const message: WebSocketMessage = {
-        type: 'PLAYER_LEAVE',
+    this.clients.delete(playerId)
+    this.rateLimitCounters.delete(playerId)
+    try {
+      const message: OutgoingMessage = {
+        type: 'PLAYER_LEFT',
         payload: { playerId, cells: Object.fromEntries(clearedCells) }
       }
       this.broadcastGameState(message)
     } catch (error) {
-      if (!(error instanceof Error && error.message === 'Player not found')) {
-        console.error('Error handling disconnect:', error)
-      }
+      logger.error({ error }, 'Error broadcasting player left message')
     }
   }
 
   private handleError(ws: WebSocket, error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
     const errorPayload: ErrorPayload = { message: errorMessage }
-    this.sendToClient(ws, {
-      type: 'ERROR',
-      payload: errorPayload
-    })
+
+    if (ws.readyState === WebSocket.OPEN) {
+      try {
+        this.sendToClient(ws, {
+          type: 'ERROR',
+          payload: errorPayload
+        })
+      } catch (sendError) {
+        logger.error({ error: sendError }, 'Failed to send error message to client')
+      }
+    }
   }
 
   private startGameLoop(): void {
     this.gameLoop = setInterval(() => {
       try {
         this.gameEngine.tick()
-        this.broadcastGameStateSnapshot()
+        this.broadcastGameTickUpdate()
       } catch (error) {
-        console.error('Error in game loop:', error)
+        logger.error({ error }, 'Error in game loop')
       }
     }, this.config.tickInterval)
   }
 
-  private broadcastGameStateSnapshot() {
-    const snapshot: GameStateSnapshot = this.gameEngine.getGameStateSnapshot()
+  private broadcastGameTickUpdate() {
+    const tickUpdate: GameTickUpdate = this.gameEngine.getTickUpdate()
 
-    if (snapshot.ants.length === 0 && snapshot.cells.size === 0) {
+    if (tickUpdate.ants.length === 0 && tickUpdate.cells.size === 0) {
       return
     }
 
-    const message: WebSocketMessage = {
-      type: 'GAME_STATE_SNAPSHOT',
+    const message: OutgoingMessage = {
+      type: 'GAME_TICK_UPDATE',
       payload: {
-        ants: snapshot.ants,
-        cells: Object.fromEntries(snapshot.cells),
+        ants: tickUpdate.ants,
+        cells: Object.fromEntries(tickUpdate.cells),
       },
     }
     this.broadcastGameState(message)
   }
 
-  private broadcastGameState(message: WebSocketMessage): void {
-    this.clients.forEach(client => {
-      this.sendToClient(client, message)
+  private broadcastGameState(message: OutgoingMessage): void {
+    const data = JSON.stringify(message)
+    this.wss.clients.forEach(client => {
+      if (client.readyState !== WebSocket.OPEN) return
+
+      setImmediate(() => {
+        try {
+          client.send(data)
+        } catch (error) {
+          logger.error({ error }, 'Failed to send message to client')
+        }
+      })
     })
   }
 
-  private sendToClient(client: WebSocket, message: WebSocketMessage): void {
-    if (client.readyState === WebSocket.OPEN) {
-      try {
-        client.send(JSON.stringify(message))
-      } catch (error) {
-        console.error('Error sending message to client:', error)
-      }
+  private sendToClient(client: WebSocket, message: OutgoingMessage): void {
+    if (client.readyState !== WebSocket.OPEN) {
+      return
+    }
+
+    try {
+      client.send(JSON.stringify(message))
+    } catch (error) {
+      logger.error({ error }, 'Failed to send message to client')
     }
   }
 
-  public stop(): void {
+  public stop(reason: string = 'Server is shutting down'): void {
     if (this.gameLoop) {
       clearInterval(this.gameLoop)
       this.gameLoop = null
     }
+
+    this.broadcastMessage(reason)
+    this.wss.clients.forEach(client => {
+      client.close(1000, reason)
+    })
     this.wss.close()
+  }
+
+  public getGameState() {
+    return this.gameEngine.getState()
   }
 
   private isRateLimited(playerId: string): boolean {
     const now = Date.now()
     const counter = this.rateLimitCounters.get(playerId) || { count: 0, windowStart: now }
 
-    if (now - counter.windowStart > RATE_LIMIT_WINDOW_MS) {
-      counter.count = 1
+    if (now - counter.windowStart > this.config.rateLimitWindowMs) {
+      counter.count = 0
       counter.windowStart = now
       this.rateLimitCounters.set(playerId, counter)
-      return false
     }
 
     counter.count += 1
     this.rateLimitCounters.set(playerId, counter)
-    return counter.count > MAX_MESSAGES_PER_WINDOW
+    return counter.count > this.config.maxMessagesPerWindow
+  }
+
+  private sendGridInChunks(client: WebSocket, cells: Map<string, Color>): void {
+    const chunkSize = this.config.gridChunkSize
+    const entries = Array.from(cells.entries())
+    const total = Math.ceil(entries.length / chunkSize)
+
+    for (let i = 0; i < total; i += 1) {
+      const slice = entries.slice(i * chunkSize, (i + 1) * chunkSize)
+      const payload = {
+        chunk: i + 1,
+        total,
+        cells: Object.fromEntries(slice) as Record<string, Color>
+      }
+      const message: OutgoingMessage = { type: 'GRID_CHUNK', payload }
+      this.sendToClient(client, message)
+    }
+  }
+
+  private broadcastMessage(message: string): void {
+    const data = JSON.stringify({ type: 'INFO', payload: { message } })
+    this.wss.clients.forEach(client => {
+      if (client.readyState !== WebSocket.OPEN) {
+        return
+      }
+
+      setImmediate(() => {
+        try {
+          client.send(data)
+        } catch (error) {
+          logger.error({ error }, 'Failed to send message to client')
+        }
+      })
+    })
   }
 } 
