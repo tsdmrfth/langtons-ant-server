@@ -53,13 +53,19 @@ export class GameEngine {
     const clearedCells = new Map<string, Color>()
     for (const [cellKey, cellColor] of this.state.grid.cells.entries()) {
       if (cellColor === player.color) {
-        this.state.grid.cells.set(cellKey, COLOR_WHITE)
+        const position = this.getPositionFromCellKey(cellKey)
+        this.updateCell(position, COLOR_WHITE)
         clearedCells.set(cellKey, COLOR_WHITE)
       }
     }
 
     this.state.players.delete(playerId)
     return { clearedCells }
+  }
+
+  private getPositionFromCellKey(cellKey: string): Position {
+    const [x, y] = cellKey.split(',').map(Number)
+    return { x, y }
   }
 
   public placeAnt(playerId: string, position: Position, rules?: Rule[], direction: Direction = 'UP'): Ant {
@@ -231,7 +237,9 @@ export class GameEngine {
     const cellKey = this.getCellKey(position)
 
     if (color === COLOR_WHITE) {
+      console.log('deleting cell', this.state.grid.cells.size)
       this.state.grid.cells.delete(cellKey)
+      console.log('cell deleted', this.state.grid.cells.size)
     } else {
       this.state.grid.cells.set(cellKey, color)
     }
