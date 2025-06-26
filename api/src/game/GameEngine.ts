@@ -238,6 +238,7 @@ export class GameEngine {
     this.updateCell(ant.position, newColor)
     this.changedCells.set(this.getCellKey(ant.position), newColor)
     occupiedPositions.set(newPositionCellKey, ant)
+    occupiedPositions.delete(this.getCellKey(ant.position))
     return { ...ant, direction: newDirection, position: newPosition }
   }
 

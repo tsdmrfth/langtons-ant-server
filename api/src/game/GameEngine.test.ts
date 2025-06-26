@@ -305,6 +305,18 @@ describe('GameEngine', () => {
             const cells = gameEngine.getState().grid.cells
             expect(Object.values(cells).every(color => color !== COLOR_WHITE)).toBe(true)
         })
+
+        it('should delete the occupied position when ant moves to a new position', () => {
+            gameEngine.placeAnt(player1.id, { x: 10, y: 10 }, [RULE_R])
+            gameEngine.placeAnt(player2.id, { x: 9, y: 10 }, [RULE_R])
+            gameEngine.tick()
+            const state = gameEngine.getState()
+            expect(state.ants.length).toBe(2)
+            expect(state.ants[0].position).toEqual({ x: 11, y: 10 })
+            expect(state.ants[0].direction).toBe('RIGHT')
+            expect(state.ants[1].position).toEqual({ x: 10, y: 10 })
+            expect(state.ants[1].direction).toBe('RIGHT')
+        })
     })
 
     describe('Grid and State Management', () => {
@@ -374,7 +386,7 @@ describe('GameEngine', () => {
         })
 
         it('should throw if grid size is invalid', () => {
-            expect(() => gameEngine.updateConfig(0, 100)).toThrow('Grid width and height must be greater than 0')
+            expect(() => gameEngine.updateConfig(0, 100)).toThrow('Grid width and height must be greater than 1')
         })
     })
 }) 
