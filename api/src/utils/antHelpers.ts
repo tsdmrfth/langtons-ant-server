@@ -28,3 +28,10 @@ export function moveAnt(position: Position, direction: Direction, gridWidth: num
 
   return next
 }
+
+export function turnAnt180(current: Direction): Direction {
+  const directions: Direction[] = ['UP', 'RIGHT', 'DOWN', 'LEFT']
+  const currentIndex = directions.indexOf(current)
+  const newIndex = (currentIndex + 2) % directions.length
+  return directions[newIndex]
+}

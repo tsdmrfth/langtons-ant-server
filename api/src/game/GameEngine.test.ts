@@ -277,10 +277,10 @@ describe('GameEngine', () => {
             const ant2 = ants.find(a => a.id === gameEngine.getState().players.get(player2.id)?.antId)!
             expect(ant1.position).toEqual({ x: 11, y: 10 })
             expect(ant1.direction).toBe('RIGHT')
-            expect(ant2.position).toEqual({ x: 12, y: 10 })
-            expect(ant2.direction).toBe('UP')
-            expect(gameEngine.getTickUpdate().cells.has('12,10')).toBe(false)
-            expect(gameEngine.getTickUpdate().cells.has('11,9')).toBe(false)
+            expect(ant2.position).toEqual({ x: 13, y: 10 })
+            expect(ant2.direction).toBe('RIGHT')
+            expect(gameEngine.getTickUpdate().cells.get('10,10')).toBe(player1.color)
+            expect(gameEngine.getTickUpdate().cells.get('12,10')).toBe(player2.color)
         })
 
         it('should create occupiedPositions Map correctly and prevent ant collisions', () => {
@@ -290,10 +290,10 @@ describe('GameEngine', () => {
             const ants = gameEngine.getState().ants
             const ant1 = ants.find(ant => ant.id === gameEngine.getState().players.get(player1.id)?.antId)!
             const ant2 = ants.find(ant => ant.id === gameEngine.getState().players.get(player2.id)?.antId)!
-            expect(ant1.position).toEqual({ x: 10, y: 10 })
+            expect(ant1.position).toEqual({ x: 9, y: 10 })
             expect(ant2.position).toEqual({ x: 12, y: 10 })
             const tickUpdate = gameEngine.getTickUpdate()
-            expect(tickUpdate.cells.size).toBe(1)
+            expect(tickUpdate.cells.size).toBe(2)
             expect(tickUpdate.cells.get('11,10')).toBe(player2.color)
         })
 

@@ -70,6 +70,7 @@ export class WebSocketServer {
           payload: {
             player,
             state: {
+              players: Object.fromEntries(fullState.players),
               ants: fullState.ants,
               grid: {
                 width: fullState.grid.width,

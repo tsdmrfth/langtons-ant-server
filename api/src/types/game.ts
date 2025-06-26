@@ -105,6 +105,7 @@ export interface ErrorPayload {
 export interface WelcomeMessagePayload {
   player: Player
   state: {
+    players: Record<string, Player>
     ants: Ant[]
     grid: {
       width: number

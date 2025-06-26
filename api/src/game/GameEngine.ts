@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid'
 import { COLOR_WHITE } from '../config'
 import { Ant, Color, Direction, GameConfig, GameState, GameTickUpdate, Player, Position, Rule } from '../types/game'
-import { moveAnt, turnAnt } from '../utils/antHelpers'
+import { moveAnt, turnAnt, turnAnt180 } from '../utils/antHelpers'
 import logger from '../utils/logger'
 
 export class GameEngine {
@@ -221,12 +221,18 @@ export class GameEngine {
       return ant
     }
 
-    const newDirection = turnAnt(ant.direction, rule.turnDirection)
-    const newPosition = moveAnt(ant.position, newDirection, this.config.gridWidth, this.config.gridHeight)
-    const newPositionCellKey = this.getCellKey(newPosition)
+    let newDirection = turnAnt(ant.direction, rule.turnDirection)
+    let newPosition = moveAnt(ant.position, newDirection, this.config.gridWidth, this.config.gridHeight)
+    let newPositionCellKey = this.getCellKey(newPosition)
 
     if (occupiedPositions.has(newPositionCellKey)) {
-      return ant
+      newDirection = turnAnt180(rule.turnDirection)
+      newPosition = moveAnt(ant.position, newDirection, this.config.gridWidth, this.config.gridHeight)
+      newPositionCellKey = this.getCellKey(newPosition)
+
+      if (occupiedPositions.has(newPositionCellKey)) {
+        return ant
+      }
     }
 
     this.updateCell(ant.position, newColor)
