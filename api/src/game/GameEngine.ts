@@ -337,8 +337,8 @@ export class GameEngine {
       throw new Error('Cannot update config: game already started')
     }
 
-    if (gridSize < 1) {
-      throw new Error('Grid width and height must be greater than 0')
+    if (gridSize < 2) {
+      throw new Error('Grid width and height must be greater than 1')
     }
 
     this.config = {
