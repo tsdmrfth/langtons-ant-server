@@ -120,10 +120,18 @@ export interface GridChunkPayload {
   cells: Record<string, Color>
 }
 
+export interface UpdateGameConfigPayload {
+  gridSize: number
+  tickInterval: number
+}
+
+export interface UpdateGameConfigResponsePayload extends UpdateGameConfigPayload {}
+
 export type IncomingMessage =
   | { type: 'PLACE_ANT'; payload: PlaceAntPayload }
   | { type: 'CHANGE_RULES'; payload: RuleChangePayload }
   | { type: 'FLIP_TILE'; payload: TileFlipPayload }
+  | { type: 'UPDATE_GAME_CONFIG'; payload: UpdateGameConfigPayload }
 
 export type OutgoingMessage =
   | { type: 'GAME_TICK_UPDATE'; payload: GameTickUpdatePayload }
@@ -134,6 +142,7 @@ export type OutgoingMessage =
   | { type: 'RULES_CHANGED'; payload: RuleChangeResponsePayload }
   | { type: 'TILE_FLIPPED'; payload: TileFlipResponsePayload }
   | { type: 'GRID_CHUNK'; payload: GridChunkPayload }
+  | { type: 'GAME_CONFIG_UPDATED'; payload: UpdateGameConfigResponsePayload }
   | { type: 'ERROR'; payload: ErrorPayload }
 
 export type WebSocketMessage = IncomingMessage | OutgoingMessage

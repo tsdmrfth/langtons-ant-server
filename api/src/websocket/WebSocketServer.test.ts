@@ -170,6 +170,55 @@ describe('WebSocketServer', () => {
     })
   })
 
+  it('updates game config before game starts and broadcasts GAME_CONFIG_UPDATED', done => {
+    const client = createClient()
+    let gotWelcome = false
+    client.on('message', data => {
+      const message = JSON.parse(data.toString())
+      if (message.type === 'WELCOME') {
+        gotWelcome = true
+        client.send(JSON.stringify({
+          type: 'UPDATE_GAME_CONFIG',
+          payload: { gridSize: 42, tickInterval: 123 }
+        }))
+      }
+      if (gotWelcome && message.type === 'GAME_CONFIG_UPDATED') {
+        expect(message.payload.gridSize).toBe(42)
+        expect(message.payload.tickInterval).toBe(123)
+        client.close()
+        done()
+      }
+    })
+  })
+
+  it('returns error if updating config after ant placed', done => {
+    const client = createClient()
+    let phase = 0
+    const rules = [{ cellColor: '#FFFFFF', turnDirection: 'RIGHT' }]
+    client.on('message', data => {
+      const message = JSON.parse(data.toString())
+      if (message.type === 'WELCOME' && phase === 0) {
+        client.send(JSON.stringify({
+          type: 'PLACE_ANT',
+          payload: { position: { x: 0, y: 0 }, rules }
+        }))
+        phase = 1
+      }
+      if (message.type === 'ANT_PLACED' && phase === 1) {
+        client.send(JSON.stringify({
+          type: 'UPDATE_GAME_CONFIG',
+          payload: { gridSize: 99, tickInterval: 99 }
+        }))
+        phase = 2
+      }
+      if (message.type === 'ERROR' && phase === 2) {
+        expect(message.payload.message).toMatch(/game already started/i)
+        client.close()
+        done()
+      }
+    })
+  })
+
   describe('Security', () => {
     it('rejects connections from disallowed origins', done => {
       wss.stop()

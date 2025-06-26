@@ -13,7 +13,8 @@ import {
   RuleChangePayload,
   RuleChangeResponsePayload,
   TileFlipPayload,
-  TileFlipResponsePayload
+  TileFlipResponsePayload,
+  UpdateGameConfigPayload
 } from '../types/game'
 import logger from '../utils/logger'
 
@@ -21,13 +22,13 @@ const VALID_INCOMING_MESSAGE_TYPES = [
   'PLACE_ANT',
   'CHANGE_RULES',
   'FLIP_TILE',
+  'UPDATE_GAME_CONFIG',
 ]
 
 export class WebSocketServer {
   private wss: WSServer
   private gameEngine: GameEngine
   private clients: Map<string, WebSocket>
-  private gameLoop: NodeJS.Timeout | null
   private rateLimitCounters: Map<string, { count: number, windowStart: number }>
   private allowedOrigins: string[]
   private config: GameConfig
@@ -48,7 +49,6 @@ export class WebSocketServer {
     this.gameEngine = new GameEngine(config)
     this.clients = new Map()
     this.rateLimitCounters = new Map()
-    this.gameLoop = null
     this.config = config
     this.initialize()
   }
@@ -150,7 +150,9 @@ export class WebSocketServer {
       })
     }, this.config.heartbeatInterval)
     this.wss.on('close', () => clearInterval(heartbeatInterval))
-    this.startGameLoop()
+    this.gameEngine.startGameLoop(({ tickUpdate }) => {
+      this.broadcastGameTickUpdate(tickUpdate)
+    })
   }
 
   private validateMessage(message: IncomingMessage): void {
@@ -184,6 +186,10 @@ export class WebSocketServer {
       case 'FLIP_TILE':
         this.handleTileFlipMessage(client, playerId, incomingMessage)
         break
+      case 'UPDATE_GAME_CONFIG': {
+        this.handleUpdateGameConfigMessage(client, playerId, incomingMessage)
+        break
+      }
       default:
         break
     }
@@ -242,6 +248,19 @@ export class WebSocketServer {
     }
   }
 
+  private handleUpdateGameConfigMessage(client: WebSocket, playerId: string, incomingMessage: IncomingMessage): void {
+    const { gridSize, tickInterval } = incomingMessage.payload as UpdateGameConfigPayload
+    try {
+      this.gameEngine.updateConfig(gridSize, tickInterval)
+      this.broadcastGameState({
+        type: 'GAME_CONFIG_UPDATED',
+        payload: { gridSize, tickInterval }
+      })
+    } catch (error) {
+      this.handleError(client, error)
+    }
+  }
+
   private handleDisconnect(playerId: string): void {
     let clearedCells: Map<string, Color> = new Map()
     try {
@@ -280,20 +299,7 @@ export class WebSocketServer {
     }
   }
 
-  private startGameLoop(): void {
-    this.gameLoop = setInterval(() => {
-      try {
-        this.gameEngine.tick()
-        this.broadcastGameTickUpdate()
-      } catch (error) {
-        logger.error({ error }, 'Error in game loop')
-      }
-    }, this.config.tickInterval)
-  }
-
-  private broadcastGameTickUpdate() {
-    const tickUpdate: GameTickUpdate = this.gameEngine.getTickUpdate()
-
+  private broadcastGameTickUpdate(tickUpdate: GameTickUpdate) {
     if (tickUpdate.ants.length === 0 && tickUpdate.cells.size === 0) {
       return
     }
@@ -336,11 +342,7 @@ export class WebSocketServer {
   }
 
   public stop(reason: string = 'Server is shutting down'): void {
-    if (this.gameLoop) {
-      clearInterval(this.gameLoop)
-      this.gameLoop = null
-    }
-
+    this.gameEngine.stop()
     this.broadcastMessage(reason)
     this.wss.clients.forEach(client => {
       client.close(1000, reason)

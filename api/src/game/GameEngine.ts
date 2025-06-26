@@ -1,12 +1,14 @@
 import { v4 as uuidv4 } from 'uuid'
+import { COLOR_WHITE } from '../config'
 import { Ant, Color, Direction, GameConfig, GameState, GameTickUpdate, Player, Position, Rule } from '../types/game'
 import { moveAnt, turnAnt } from '../utils/antHelpers'
-import { COLOR_WHITE } from '../config'
+import logger from '../utils/logger'
 
 export class GameEngine {
   private state: GameState
   private config: GameConfig
   private changedCells: Map<string, Color> = new Map()
+  private gameLoop: NodeJS.Timeout | null = null
 
   constructor(config: GameConfig) {
     this.config = config
@@ -237,9 +239,7 @@ export class GameEngine {
     const cellKey = this.getCellKey(position)
 
     if (color === COLOR_WHITE) {
-      console.log('deleting cell', this.state.grid.cells.size)
       this.state.grid.cells.delete(cellKey)
-      console.log('cell deleted', this.state.grid.cells.size)
     } else {
       this.state.grid.cells.set(cellKey, color)
     }
@@ -323,6 +323,49 @@ export class GameEngine {
       },
       ants: [],
       players: new Map()
+    }
+  }
+
+  public updateConfig(gridSize: number, tickInterval: number): void {
+    if (this.state.ants.length > 0) {
+      throw new Error('Cannot update config: game already started')
+    }
+
+    if (gridSize < 1) {
+      throw new Error('Grid width and height must be greater than 0')
+    }
+
+    this.config = {
+      ...this.config,
+      gridWidth: gridSize,
+      gridHeight: gridSize,
+      tickInterval
+    }
+    this.state.grid.width = gridSize
+    this.state.grid.height = gridSize
+  }
+
+  public startGameLoop(callback: ({ tickUpdate }: { tickUpdate: GameTickUpdate }) => void): void {
+    this.gameLoop = setInterval(() => {
+      try {
+        this.tick()
+        const tickUpdate: GameTickUpdate = this.getTickUpdate()
+
+        if (tickUpdate.ants.length === 0 && tickUpdate.cells.size === 0) {
+          return
+        }
+
+        callback({ tickUpdate })
+      } catch (error) {
+        logger.error({ error }, 'Error in game loop')
+      }
+    }, this.config.tickInterval)
+  }
+
+  public stop(): void {
+    if (this.gameLoop) {
+      clearInterval(this.gameLoop)
+      this.gameLoop = null
     }
   }
 }

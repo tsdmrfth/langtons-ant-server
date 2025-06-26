@@ -358,4 +358,23 @@ describe('GameEngine', () => {
             })
         })
     })
+
+    describe('Game Config Updates', () => {
+        it('should update config before game starts', () => {
+            gameEngine.updateConfig(30, 200)
+            const state = gameEngine.getState()
+            expect(state.grid.width).toBe(30)
+            expect(state.grid.height).toBe(30)
+        })
+
+        it('should throw if updating config after ant placed', () => {
+            const player = gameEngine.addPlayer()
+            gameEngine.placeAnt(player.id, { x: 1, y: 1 })
+            expect(() => gameEngine.updateConfig(40, 100)).toThrow('Cannot update config: game already started')
+        })
+
+        it('should throw if grid size is invalid', () => {
+            expect(() => gameEngine.updateConfig(0, 100)).toThrow('Grid width and height must be greater than 0')
+        })
+    })
 }) 
