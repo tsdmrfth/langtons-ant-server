@@ -1,4 +1,4 @@
-import { turnAnt, moveAnt } from './antHelpers'
+import { turnAnt, moveAnt, turnAnt180 } from './antHelpers'
 import { Direction, Position } from '../types/game'
 
 describe('antHelpers', () => {
@@ -20,6 +20,31 @@ describe('antHelpers', () => {
                 dir = turnAnt(dir, 'RIGHT')
                 expect(directions).toContain(dir)
             }
+        })
+    })
+
+    describe('turnAnt180', () => {
+        it('handles all direction pairs correctly', () => {
+            const directionPairs: [Direction, Direction][] = [
+                ['UP', 'DOWN'],
+                ['DOWN', 'UP'],
+                ['LEFT', 'RIGHT'],
+                ['RIGHT', 'LEFT']
+            ]
+
+            directionPairs.forEach(([from, to]) => {
+                expect(turnAnt180(from)).toBe(to)
+            })
+        })
+
+        it('double turn returns to original direction', () => {
+            const directions: Direction[] = ['UP', 'RIGHT', 'DOWN', 'LEFT']
+            
+            directions.forEach(direction => {
+                const turned180 = turnAnt180(direction)
+                const turnedBack = turnAnt180(turned180)
+                expect(turnedBack).toBe(direction)
+            })
         })
     })
 
