@@ -22,10 +22,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          cache: yarn
-          cache-dependency-path: yarn.lock
+          cache: npm
+          cache-dependency-path: package-lock.json
       - name: Install dependencies
-        run: yarn install --immutable
+        run: npm install --immutable
       - name: Check TypeScript
         run: yarn check-typescript
       - name: Test api
