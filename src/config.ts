@@ -1,8 +1,8 @@
 import { GameConfig } from './types/game'
 
 export const DEFAULT_GAME_CONFIG: GameConfig = {
-  gridWidth: 20,
-  gridHeight: 20,
+  gridWidth: 100,
+  gridHeight: 100,
   tickInterval: 250,
   maxPlayers: 10,
   heartbeatInterval: 10000,
