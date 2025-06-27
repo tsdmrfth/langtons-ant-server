@@ -2,7 +2,7 @@ module.exports = {
     apps: [{
         name: "langtons-ant-server",
         script: "./dist/src/server.js",
-        instances: "max",
+        instances: 1,
         env: {
             NODE_ENV: "development",
         },
