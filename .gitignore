@@ -1,0 +1,8 @@
+# Local Netlify folder
+.netlify
+node_modules
+dist
+converage
+.cursor
+.yarn/*
+.DS_Store
