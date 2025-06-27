@@ -1,6 +1,7 @@
 {
   "name": "api",
   "scripts": {
+    "build": "tsc",
     "build:server": "tsc",
     "start": "pm2-runtime start ecosystem.config.js --env production",
     "dev": "yarn build:server && node dist/src/server.js",
@@ -31,7 +32,7 @@
     "ts-jest": "^29.4.0"
   },
   "engines": {
-    "node": "24.1.0"
+    "node": "24.x"
   },
   "packageManager": "yarn@4.6.0"
 }

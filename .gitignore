@@ -6,3 +6,5 @@ converage
 .cursor
 .yarn/*
 .DS_Store
+npm-debug.log
+.env
