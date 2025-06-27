@@ -109,7 +109,7 @@ The production server uses PM2 for process management and automatic restarts.
 | **Runtime** | Node.js for high-performance server-side JavaScript |
 | **WebSocket** | Native WebSocket API for real-time communication |
 | **State model** | `GameEngine` class keeps all grid data in memory for ultra-low latency; grid is a `Map` keyed by `x,y` and sharded into fixed-size chunks to minimise diff payloads |
-| **Collision policy** | During a tick, ants are processed in player-join order; if two ants attempt the same cell, the first ant moves, the others stay. This keeps determinism but is biased – Randomised ordering or hashed fairness could be added as a future improvement. |
+| **Collision policy** | When an ant attempts to move to an occupied cell, it first tries to turn 180 degrees and move in the opposite direction. If that position is also occupied, the ant stays in place. This provides a more dynamic collision resolution while maintaining determinism. |
 | **Colour allocation** | Random RGB excluding already-used values; guarantees uniqueness. |
 | **Testing** | Jest unit tests for all game logic and WebSocket contract; CI step aborts on failure. |
 | **Performance** | `permessage-deflate` is enabled in the WS handshake which cuts average snapshot payload size in local profiling and boosts ops/sec at shorter tick intervals. |
@@ -246,6 +246,7 @@ This branch introduces significant improvements to the Langton's Ant API, focusi
 - **Player Management**: Improved player removal with automatic cell clearing
 - **Ant Placement**: Enhanced validation for position bounds and coordinate types
 - **Game Loop**: Optimized tick processing with better state management
+- **Collision Policy**: Improved collision resolution with 180 degree turn rule
 
 ### **WebSocket Protocol Improvements**
 - **Message Types**: Added new message types and standardized existing ones for better consistency:
