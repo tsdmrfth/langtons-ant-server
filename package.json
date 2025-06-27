@@ -4,9 +4,9 @@
     "build": "tsc",
     "build:server": "tsc",
     "start": "pm2-runtime start ecosystem.config.js --env production",
-    "dev": "yarn build:server && node dist/src/server.js",
+    "dev": "npm run build:server && node dist/src/server.js",
     "test": "jest src/**/*.test.ts",
-    "benchmark": "yarn build:server && node dist/scripts/benchmark.js",
+    "benchmark": "npm run build:server && node dist/scripts/benchmark.js",
     "postinstall": "tsc",
     "check-typescript": "tsc --noEmit"
   },
