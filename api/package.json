@@ -6,7 +6,8 @@
     "dev": "yarn build:server && node dist/src/server.js",
     "test": "jest src/**/*.test.ts",
     "benchmark": "yarn build:server && node dist/scripts/benchmark.js",
-    "postinstall": "tsc"
+    "postinstall": "tsc",
+    "check-typescript": "tsc --noEmit"
   },
   "dependencies": {
     "express": "^5.1.0",

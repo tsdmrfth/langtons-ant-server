@@ -2,9 +2,11 @@ name: CI
 
 "on":
   push:
-    branches: [ main ]
+    branches:
+      - main-v2
   pull_request:
-    branches: [ main ]
+    branches:
+      - main-v2
 
 jobs:
   build-test:
@@ -27,7 +29,7 @@ jobs:
           cache-dependency-path: api/yarn.lock
       - name: Install dependencies
         run: yarn install --immutable
-      - name: Build api
-        run: yarn build:server
+      - name: Check TypeScript
+        run: yarn check-typescript
       - name: Test api
-        run: yarn test 
+        run: yarn test
