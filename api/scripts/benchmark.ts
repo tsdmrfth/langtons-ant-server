@@ -1,6 +1,6 @@
+import { randomInt } from 'crypto'
 import { GameEngine } from '../src/game/GameEngine'
 import { GameConfig, Position, Rule } from '../src/types/game'
-import { randomInt } from 'crypto'
 
 interface BenchmarkResult {
     grid: number
@@ -14,9 +14,11 @@ function createEngine(gridSize: number, players: number): GameEngine {
         gridWidth: gridSize,
         gridHeight: gridSize,
         tickInterval: 250,
-        chunkSize: 50,
         maxPlayers: players,
-        heartbeatInterval: 10000
+        heartbeatInterval: 10000,
+        rateLimitWindowMs: 1000,
+        maxMessagesPerWindow: 30,
+        gridChunkSize: 1000
     }
 
     const engine = new GameEngine(config)
@@ -31,8 +33,7 @@ function createEngine(gridSize: number, players: number): GameEngine {
 
         const rules: Rule[] = [
             {
-                currentColor: '#FFFFFF',
-                newColor: player.color,
+                cellColor: '#FFFFFF',
                 turnDirection: 'RIGHT'
             }
         ]
