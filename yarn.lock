@@ -1538,6 +1538,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "api@workspace:."
   dependencies:
+    "@babel/core": "npm:^7.27.4"
     "@babel/preset-typescript": "npm:^7.27.1"
     "@types/express": "npm:^5.0.3"
     "@types/jest": "npm:^29.5.14"
