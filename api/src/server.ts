@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express'
 import { createServer } from 'http'
 import { DEFAULT_GAME_CONFIG } from './config'
 import { WebSocketServer } from './websocket/WebSocketServer'
+import logger from './utils/logger'
 
 const app = express()
 const port = process.env.PORT || 3001
@@ -15,13 +16,14 @@ app.get('/health', (_: Request, response: Response) => {
 })
 
 server.listen(port, () => {
-  console.log(`Server is running on port ${port}`)
+  logger.info(`Server is running on port ${port}`)
 })
 
 process.on('SIGTERM', () => {
-  console.log('SIGTERM signal received: closing HTTP server')
+  logger.info('SIGTERM signal received: closing HTTP server')
   wss.stop()
   server.close(() => {
-    console.log('HTTP server closed')
+    logger.info('HTTP server closed')
   })
+  process.exit(0)
 }) 
