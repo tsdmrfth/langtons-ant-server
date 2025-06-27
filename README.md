@@ -1,59 +1,13 @@
-# Multiplayer Langton's Ant
+# Multiplayer Langton's Ant Server
 
 ## Description
 Langton's Ant is a two-dimensional cellular automaton with simple local rules that produce complex global behaviour.  
-This repository contains a **multiplayer, real-time, browser-based** implementation where every connected player controls an individual ant with a unique colour and rule-set. The service consists of:
+This repository contains a **multiplayer, real-time** WebSocket server implementation where every connected player controls an individual ant with a unique colour and rule-set. The service consists of:
 
-* **api/** – a Node + TypeScript WebSocket server responsible for game state, tick processing, validation and broadcasting.
-  - For a complete description of all public classes, methods and message schemas see [API_REFERENCE.md](./api/API_REFERENCE.md).
-* **client/** – a React web application that renders the shared grid, lets the player define rules, place an ant, and interact with tiles.
+* **Server** – a Node + TypeScript WebSocket server responsible for game state, tick processing, validation and broadcasting.
+  - For a complete description of all public classes, methods and message schemas see [API_REFERENCE.md](./API_REFERENCE.md).
 
 The server maintains a single authoritative grid; clients receive incremental snapshots every 250 ms and render only the changed chunks for performance.
-
----
-# Client Setup
-
-## Getting Started
-
-### Prerequisites
-* Node ≥ 24.X
-* npm ≥ 10.9.0
-
-#### 1 — Clone & install
-```bash
-git clone https://github.com/tsdmrfth/langtons-ant
-cd langtons-ant
-yarn install
-```
-
-#### 2 — Run the client (dev mode)
-Make sure you're in client folder
-
-```bash
-cd client
-```
-
-Run the client
-```bash
-yarn dev
-```
-
-The client will be available at `http://localhost:5173`
-
-#### 3 — Build for production
-```bash
-cd client
-yarn build
-```
-
-#### 4 — Preview production build
-```bash
-cd client
-yarn preview
-```
-
-#### 5 - Production build & deploy
-- Missing
 
 ---
 # Server Setup
@@ -72,140 +26,88 @@ yarn install
 ```
 
 #### 2 — Run the server (dev mode)
-Make sure you're in api folder
-
-```bash
-cd api
-```
-
 Run the server
 ```bash
 yarn dev
 ```
 
 #### 3 — Run unit tests
-Make sure you're in api folder
-
-```bash
-cd api
-```
-
 Run the tests
 ```bash
 yarn test
 ```
 
-#### 4 — Production build & deploy
-- Missing
+#### 4 — Production deployment
+The server is automatically deployed to Heroku via GitHub Actions CI/CD pipeline. Every push to the `main-v2` branch triggers:
+1. TypeScript compilation validation
+2. Test suite execution
+3. Automatic deployment to Heroku if all checks pass
+
+The production server uses PM2 for process management and automatic restarts.
 
 ---
-## Client Features
+## Server Features
 
-### ✅ Implemented Features
+#### Game Engine
+- **Real-time Game Loop**: Efficient tick processing with configurable intervals
+- **Grid Management**: In-memory grid storage with chunked transmission for performance
+- **Ant Movement**: Accurate ant movement and collision detection
+- **Rule System**: Flexible rule definition with validation and enforcement
+- **Player Management**: Dynamic player connection/disconnection handling
 
-#### Frontend Implementation
-- **Canvas-based Grid Renderer**: Uses HTML5 Canvas for efficient rendering of the game grid
-- **Real-time Updates**: Smooth rendering with incremental updates every 250ms
-- **Zoom and Pan**: Interactive canvas with zoom controls and pan functionality
-- **Responsive Design**: Modern UI with Tailwind CSS and shadcn/ui components
-- **Performant rendering**: Only renders changed cells and ant positions
-
-#### Rule Definition System
-- **Collapsible Rule Editor**: Interactive UI for defining custom ant rules
-- **Visual Color Picker**: Color selection for different cell states
-- **Turn Direction Selection**: LEFT/RIGHT turn options for each rule
-- **Real-time Rule Updates**: Rules are sent to server and synchronized across clients
-
-#### Grid Interaction
-- **Ant Placement**: Click to place ant on grid (when in placement mode)
-- **Tile Flipping**: Click tiles to flip colors (white ↔ player color)
-- **Player Color Isolation**: Other players' tiles are treated as white for rule application
-- **Visual Feedback**: Clear indication of placement mode and interactive states
-
-#### WebSocket Integration
-- **Automatic Reconnection**: Robust reconnection logic with exponential backoff
+#### WebSocket Protocol
+- **Real-time Communication**: WebSocket-based communication with automatic reconnection
 - **Message Validation**: Comprehensive validation of incoming WebSocket messages
-- **Error Handling**: Toast notifications for connection status and errors
+- **Error Handling**: Detailed error responses with specific error messages
 - **State Synchronization**: Real-time game state updates across all clients
+- **Grid Chunking**: Efficient large grid transmission with chunked updates
 
 #### Player Management
 - **Unique Color Assignment**: Each player gets a unique random color on connection
-- **Player List**: Visual display of all connected players and their ants
-- **Connection Status**: Real-time connection status indicator
-- **Player Disconnection Handling**: Graceful handling of player disconnections
+- **Player Tracking**: Real-time tracking of all connected players and their ants
+- **Connection Management**: Graceful handling of player connections and disconnections
+- **Session Management**: Stateless design for scalability
 
-#### User Experience
-- **Toast Notifications**: Comprehensive feedback for all user actions
-- **Loading States**: Visual feedback during async operations
-- **Error Boundaries**: Graceful error handling with recovery options
-- **Mobile Responsive**: Works on both desktop and mobile devices
+#### Game Logic
+- **Rule Validation**: Comprehensive rule validation with mandatory white and player color rules
+- **Collision Detection**: Deterministic collision resolution with player-join order priority
+- **Ant Placement**: Validated ant placement with bounds checking
+- **Tile Management**: Efficient tile state management and updates
 
 ### 🔧 Technical Implementation
 
 #### Architecture
-- **React 18**: Modern React with hooks and functional components
+- **Node.js**: High-performance server runtime
 - **TypeScript**: Full type safety with strict configuration
-- **Zustand**: Lightweight state management for game and UI state
-- **Vite**: Fast development server and build tool
-- **Tailwind CSS**: Utility-first CSS framework for styling
-
-#### State Management
-- **Game Store**: Manages game state, ants, players, and grid data
-- **UI Store**: Handles UI state, connection status, and user interactions
-- **WebSocket Service**: Singleton service for WebSocket communication
+- **WebSocket**: Native WebSocket API for real-time communication
+- **In-Memory Storage**: Ultra-low latency grid storage with Map-based data structures
 
 #### Performance Optimizations
-- **Canvas Rendering**: Efficient canvas-based grid rendering
-- **Incremental Updates**: Only renders changed grid chunks
-- **Debounced Interactions**: Performance optimization for user interactions
-- **Memory Management**: Proper cleanup of animation frames and event listeners
+- **Grid Chunking**: Efficient transmission of large grids with chunked updates
+- **Incremental Updates**: Only transmits changed grid chunks
+- **Memory Management**: Optimized memory usage with efficient data structures
+- **Rate Limiting**: Prevents message flooding and abuse
 
 #### Error Handling
-- **Validation Utilities**: Comprehensive input validation
-- **Error Boundaries**: React error boundaries for component error handling
-- **WebSocket Error Recovery**: Automatic reconnection and error recovery
-- **User Feedback**: Clear error messages and recovery options
-
-### ❌ Missing Features (Requirements Not Met)
-
-#### Deployment & Production
-- **Production Deployment Script**: Missing deployment automation
-- **Environment Configuration**: Missing production environment setup
-- **Build Optimization**: Missing production build optimizations
+- **Validation Utilities**: Comprehensive input validation for all messages
+- **Error Recovery**: Graceful error handling throughout the application
+- **Logging**: Comprehensive logging with Pino for debugging and monitoring
+- **Health Checks**: Server health monitoring endpoint
 
 #### Testing
-- **Unit Tests**: Missing comprehensive test suite for client components
 - **Integration Tests**: Missing WebSocket integration tests
-- **E2E Tests**: Missing end-to-end testing
+- **Load Testing**: Missing comprehensive load testing
 
-#### Performance Monitoring
-- **Performance Metrics**: Missing performance monitoring and analytics
-- **Error Reporting**: Missing external error reporting service integration
-- **Load Testing**: Missing client-side performance testing
-
-#### Accessibility
-- **Keyboard Navigation**: Limited keyboard accessibility
-- **Screen Reader Support**: Missing ARIA labels and screen reader optimization
-- **Color Contrast**: Missing accessibility color contrast validation
-
-#### Advanced Features
-- **Grid Size Configuration**: Missing client-side grid size configuration UI
-- **Rule Templates**: Missing predefined rule templates
-- **Game History**: Missing replay or history functionality
-- **Export/Import**: Missing game state export/import functionality
+#### Infrastructure
+- **Backup**: Missing data backup and recovery mechanisms
 
 ---
 ## Technical Choices
 | Topic | Decision & Rationale |
 |-------|----------------------|
 | **Language** | TypeScript with `strict: true` for reliability and editor tooling |
-| **Frontend Framework** | React 18 with hooks for modern, performant UI development |
-| **State Management** | Zustand for lightweight, simple state management without boilerplate |
-| **UI Library** | shadcn/ui with Tailwind CSS for consistent, accessible components |
-| **Canvas Rendering** | HTML5 Canvas for efficient grid rendering and smooth animations |
-| **WebSocket Library** | Native WebSocket API with custom service layer for control |
-| **Build Tool** | Vite for fast development and optimized production builds |
-| **Styling** | Tailwind CSS for utility-first styling and responsive design |
+| **Runtime** | Node.js for high-performance server-side JavaScript |
+| **WebSocket** | Native WebSocket API for real-time communication |
 | **State model** | `GameEngine` class keeps all grid data in memory for ultra-low latency; grid is a `Map` keyed by `x,y` and sharded into fixed-size chunks to minimise diff payloads |
 | **Collision policy** | During a tick, ants are processed in player-join order; if two ants attempt the same cell, the first ant moves, the others stay. This keeps determinism but is biased – Randomised ordering or hashed fairness could be added as a future improvement. |
 | **Colour allocation** | Random RGB excluding already-used values; guarantees uniqueness. |
@@ -213,41 +115,40 @@ yarn test
 | **Performance** | `permessage-deflate` is enabled in the WS handshake which cuts average snapshot payload size in local profiling and boosts ops/sec at shorter tick intervals. |
 
 ---
-## Continuous Integration
-This repository ships with a GitHub Actions workflow located at `.github/workflows/ci.yml` which runs on every push and pull-request to the `main` branch.
+## Continuous Integration & Deployment
+This repository uses GitHub Actions for continuous integration and automatic deployment to Heroku.
 
-Pipeline outline
+### CI/CD Pipeline
+The workflow is located at `.github/workflows/ci.yml` and runs on every push and pull request to the `main-v2` branch.
+
+**Pipeline Steps:**
 1. Checkout code
 2. Enable Corepack then activate **Yarn 4.6.0** – matching the `packageManager` field
 3. Spin up a Node 24.x matrix runner
-4. Install dependencies with `yarn install --immutable` using the cached `api/yarn.lock`
-5. Build the TypeScript sources via `yarn build:server`
+4. Install dependencies with `yarn install --immutable` using the cached `yarn.lock`
+5. Check TypeScript compilation with `yarn check-typescript`
 6. Execute the Jest test suite with `yarn test`
+7. **Automatic Heroku deployment** (only on successful CI completion)
 
-All steps run from the `api` sub-directory to keep the mono-repo future-proof. The workflow fails fast on type errors or failing tests, ensuring main is always deployable.
+The workflow fails fast on type errors or failing tests, ensuring only validated code reaches production.
 
-**Note**: Client-side testing and build steps are missing from CI pipeline.
+### Production Deployment
+- **Platform**: Heroku
+- **Process Manager**: PM2 for automatic restarts and process management
+- **Branch**: `main-v2` (automatic deployment on successful CI)
+- **Health Check**: Available at `/health` endpoint
 
 ---
 ## Trade-offs 
 * **Colour continuity:** when a player disconnects, their colour is returned to the available pool. If they reconnect they will be treated as a new player and may receive a different colour – the implementation keeps the server stateless and avoids reserving colours indefinitely.
 * **Fairness:** current collision resolution favours earlier ants.
 * **Performance vs Memory:** In-memory grid storage provides ultra-low latency but limits scalability for very large grids.
-* **Client-side Testing:** Comprehensive testing was sacrificed for faster development and feature implementation.
-* **Accessibility:** Basic accessibility features were prioritized over advanced accessibility compliance for faster development.
-* **Production Deployment:** Manual deployment process was chosen over automated deployment for simplicity.
+* **Stateless Design:** Server is stateless for simplicity but lacks session persistence for reconnection handling.
+* **Production Deployment:** Automated deployment via GitHub Actions and Heroku for reliability and consistency.
 
 ---
 ## Future Work
 With more time, I would have liked to implement and test the following:
-
-### Client Improvements
-- **Comprehensive Testing**: Add unit tests, integration tests, and E2E tests for all client components
-- **Performance Monitoring**: Add performance metrics and monitoring for canvas rendering
-- **Accessibility Enhancement**: Improve keyboard navigation and screen reader support
-- **Advanced UI Features**: Add rule templates, grid size configuration, and game history
-- **Error Reporting**: Integrate with external error reporting service (Sentry, etc.)
-- **PWA Support**: Add Progressive Web App features for offline capability
 
 ### Server Improvements
 - Implement player session persistence for reconnection handling
@@ -258,11 +159,12 @@ With more time, I would have liked to implement and test the following:
 - Add support for other languages
 
 ### Infrastructure
-- **Automated Deployment**: Add CI/CD pipeline for both client and server
-- **Environment Management**: Add proper environment configuration management
-- **Monitoring**: Add application performance monitoring and logging
-- **Load Testing**: Add comprehensive load testing for both client and server
-- **Documentation**: Add API documentation and user guides
+- **Automated Deployment**: CI/CD pipeline with GitHub Actions and Heroku integration
+- **Process Management**: PM2 for production process management and automatic restarts
+- **Environment Management**: Heroku environment configuration
+- **Monitoring**: Application health checks and logging
+- **Load Testing**: Comprehensive load testing for server performance
+- **Documentation**: API documentation and user guides
 
 ---
 ## Performance Benchmarks
@@ -308,7 +210,6 @@ The following numbers were produced on an Apple M2 Pro using the provided benchm
 
 Run it yourself:
 ```bash
-cd api
 yarn benchmark
 ```
 
@@ -322,11 +223,8 @@ The project includes comprehensive test coverage with 51 passing tests across:
 
 Run tests with:
 ```bash
-cd api
 yarn test
 ```
-
-**Note**: Client-side testing is missing and should be added for comprehensive coverage.
 
 ---
 ## Key Changes in main-v2 branch
@@ -377,17 +275,16 @@ This branch introduces significant improvements to the Langton's Ant API, focusi
   - `maxMessagesPerWindow`: Maximum messages per window (30)
   - `gridChunkSize`: Grid chunk size for transmission (1000)
 - **Constants**: Added `COLOR_WHITE` constant for consistency
+- **Production**: PM2 process management for automatic restarts and monitoring
 
 ### 🧪 **Testing Improvements**
 - **Comprehensive Coverage**: Tests for all major functionality
 - **Error Scenarios**: Tests for various error conditions
 - **Performance Tests**: Benchmark script for performance testing
 
-### 🎨 **Client Improvements**
-- **Modern UI**: Complete React application with modern UI components
-- **Real-time Rendering**: Canvas-based grid renderer with smooth animations
-- **Rule Editor**: Interactive rule definition interface
-- **WebSocket Integration**: Robust WebSocket communication with reconnection
-- **State Management**: Efficient state management with Zustand
-- **Error Handling**: Comprehensive error handling and user feedback
-- **Responsive Design**: Mobile-responsive interface with Tailwind CSS
+### CI/CD Pipeline
+- **GitHub Actions**: CI/CD pipeline with GitHub Actions and Heroku integration
+- **Heroku**: Production deployment to Heroku
+- **PM2**: Process management for automatic restarts and monitoring
+- **Environment Management**: Heroku environment configuration
+- **Monitoring**: Application health checks and logging
