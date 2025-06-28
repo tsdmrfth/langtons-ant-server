@@ -7,6 +7,8 @@ This repository contains a **multiplayer, real-time** WebSocket server implement
 * **Server** – a Node + TypeScript WebSocket server responsible for game state, tick processing, validation and broadcasting.
   - For a complete description of all public classes, methods and message schemas see [API_REFERENCE.md](./API_REFERENCE.md).
 
+**🌐 Live Demo**: [https://tsdmrfth-langtons-ant.netlify.app](https://tsdmrfth-langtons-ant.netlify.app)
+
 The server maintains a single authoritative grid; clients receive incremental snapshots every 250 ms and render only the changed chunks for performance.
 
 ---
