@@ -117,6 +117,35 @@ The production server uses PM2 for process management and automatic restarts.
 | **Performance** | `permessage-deflate` is enabled in the WS handshake which cuts average snapshot payload size in local profiling and boosts ops/sec at shorter tick intervals. |
 
 ---
+## Requirements Conflict Resolution
+
+### The Conflict
+The original requirements contained a conceptual conflict between two stated goals:
+
+1. **Custom Rules**: "Each player can define a custom rule for their ant (e.g., specify turn directions and color flips for different tile states)"
+2. **Other Players' Tiles**: "Tiles colored by other players' ants should be treated as blank (white) for a player's ant rules"
+
+### The Problem
+If players can only define rules for "white" and "their own color", but other players' tiles are treated as white, then the "custom rules for different tile states" becomes meaningless - there are effectively only two states per ant.
+
+### Chosen Resolution
+We resolved this conflict by implementing a **simplified two-state rule system**:
+
+- **State 1**: White tiles and other players' colored tiles → Apply the "white" rule
+- **State 2**: My colored tiles → Apply the "my color" rule
+
+### Implementation Details
+The current implementation in `GameEngine.processAnt()` correctly handles this:
+
+```typescript
+const cellColor = this.getCellColor(ant.position)
+const ruleColor = cellColor === ant.color ? cellColor : COLOR_WHITE
+const newColor = cellColor === ant.color ? COLOR_WHITE : ant.color
+```
+
+This treats any non-white, non-own-color tile as white for rule purposes, which aligns with the requirement while maintaining a simple and understandable rule system.
+
+---
 ## Continuous Integration & Deployment
 This repository uses GitHub Actions for continuous integration and automatic deployment to Heroku.
 
