@@ -18,25 +18,25 @@ The server maintains a single authoritative grid; clients receive incremental sn
 
 ### Prerequisites
 * Node ≥ 24.X
-* Yarn ≥ 4.6.0
+* npm ≥ 11.3.0
 
 #### 1 — Clone & install
 ```bash
 git clone https://github.com/tsdmrfth/langtons-ant
 cd langtons-ant
-yarn install
+npm install
 ```
 
 #### 2 — Run the server (dev mode)
 Run the server
 ```bash
-yarn dev
+npm run dev
 ```
 
 #### 3 — Run unit tests
 Run the tests
 ```bash
-yarn test
+npm test
 ```
 
 #### 4 — Production deployment
@@ -125,12 +125,11 @@ The workflow is located at `.github/workflows/ci.yml` and runs on every push and
 
 **Pipeline Steps:**
 1. Checkout code
-2. Enable Corepack then activate **Yarn 4.6.0** – matching the `packageManager` field
-3. Spin up a Node 24.x matrix runner
-4. Install dependencies with `yarn install --immutable` using the cached `yarn.lock`
-5. Check TypeScript compilation with `yarn check-typescript`
-6. Execute the Jest test suite with `yarn test`
-7. **Automatic Heroku deployment** (only on successful CI completion)
+2. Spin up a Node 24.x matrix runner
+3. Install dependencies with `npm install`
+4. Check TypeScript compilation with `npm run check-typescript`
+5. Execute the Jest test suite with `npm test`
+6. **Automatic Heroku deployment** (only on successful CI completion)
 
 The workflow fails fast on type errors or failing tests, ensuring only validated code reaches production.
 
