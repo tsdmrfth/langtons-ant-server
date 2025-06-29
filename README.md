@@ -179,8 +179,6 @@ The workflow fails fast on type errors or failing tests, ensuring only validated
 ---
 ## Future Work
 With more time, I would have liked to implement and test the following:
-
-### Server Improvements
 - Implement player session persistence for reconnection handling
 - Offload tick processing to worker threads to maintain WebSocket event loop responsiveness for larger grids
 - Partition the grid across shards and broadcast merged diffs for larger loads (e.g. 10k×10k grid with 160 players)
@@ -188,6 +186,7 @@ With more time, I would have liked to implement and test the following:
 - Add a deployment script to deploy the server to a cloud provider
 - Add support for other languages
 
+---
 ### Infrastructure
 - **Automated Deployment**: CI/CD pipeline with GitHub Actions and Heroku integration
 - **Process Management**: PM2 for production process management and automatic restarts
