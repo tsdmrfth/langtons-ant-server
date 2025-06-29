@@ -239,20 +239,7 @@ The following numbers were produced on an Apple M2 Pro using the provided benchm
 
 Run it yourself:
 ```bash
-yarn benchmark
-```
-
----
-## Testing
-The project includes comprehensive test coverage with 51 passing tests across:
-- Game engine logic and state management
-- WebSocket message handling and validation
-- Ant movement and collision detection
-- Player management and rule validation
-
-Run tests with:
-```bash
-yarn test
+npm run benchmark
 ```
 
 ---
