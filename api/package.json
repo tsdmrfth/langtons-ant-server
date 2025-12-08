@@ -27,7 +27,7 @@
     "ts-jest": "^29.4.0"
   },
   "engines": {
-    "node": ">=24.x"
+    "node": "24.x"
   },
   "packageManager": "yarn@4.6.0"
 }
