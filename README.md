@@ -31,6 +31,30 @@ The server maintains a single authoritative grid; clients receive incremental sn
     *   When a socket closes (or fails heartbeat), the server removes the ant and broadcasts `PLAYER_LEAVE` to remaining clients.
 
 ---
+
+## WebSocket Message Payloads
+
+The server and client communicate using JSON messages. Each message has a `type` field and a `payload` object. The following table describes the payload structure for each message type.
+
+| Message Type | Payload Description |
+|---|---|
+| `PLAYER_JOIN` | `{ "playerId": string, "color": string }` |
+| `PLAYER_LEAVE` | `{ "playerId": string, "cells": Record<string, Cell>, "ants": Ant[] }` |
+| `PLACE_ANT` | `{ "cells": Record<string, Cell>, "ants": Ant[] }` |
+| `RULE_CHANGE` | `{ "playerId": string, "rules": Rule[] }` |
+| `TILE_FLIP` | `{ "cells": Record<string, Cell> }` |
+| `GAME_STATE_SNAPSHOT` | `GameStateSnapshot` – contains `cells` and `ants` (only the diffs) |
+| `ERROR` | `{ "message": string }` |
+
+**Types**:
+- `Cell` – `{ "x": number, "y": number, "color": string }`
+- `Ant` – `{ "id": string, "playerId": string, "position": { "x": number, "y": number }, "rules": Rule[] }`
+- `Rule` – `{ "currentColor": string, "newColor": string, "turnDirection": "LEFT" | "RIGHT" }`
+- `GameStateSnapshot` – `{ "cells": Record<string, Cell>, "ants": Ant[] }`
+
+Clients should parse the JSON and handle each type accordingly.
+
+
 # Server Setup
 
 ## Getting Started
