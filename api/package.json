@@ -1,11 +1,12 @@
 {
   "name": "api",
   "scripts": {
-    "build:server": "tsc",
-    "dev": "yarn build:server && node dist/src/server.js",
+    "build": "tsc",
+    "build:server": "yarn build",
+    "dev": "yarn build && node dist/src/server.js",
     "test": "jest src/**/*.test.ts",
-    "benchmark": "yarn build:server && node dist/scripts/benchmark.js",
-    "postinstall": "tsc"
+    "benchmark": "yarn build && node dist/scripts/benchmark.js",
+    "start": "node dist/src/server.js"
   },
   "dependencies": {
     "express": "^5.1.0",
