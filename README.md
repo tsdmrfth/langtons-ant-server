@@ -10,6 +10,26 @@ This repository contains a **multiplayer, real-time, browser-based** implementat
 
 The server maintains a single authoritative grid; clients receive incremental snapshots every 250 ms and render only the changed chunks for performance.
 
+## WebSocket Event Flow
+
+1.  **Connection (Handshake)**
+    *   Client connects via standard WebSocket.
+    *   Server assigns a unique `playerId` and random `color`.
+    *   Server broadcasts `PLAYER_JOIN` to **all connected clients** (including the new one) containing the new ID and color.
+
+2.  **Gameplay (Client Actions)**
+    *   **Place Ant:** Client sends `PLACE_ANT`. Server validates, places the ant, and broadcasts the *result* (updated cells + ant list) via `PLACE_ANT` message to all clients.
+    *   **Modify Rules:** Client sends `RULE_CHANGE`. Server updates the ant's behavior and broadcasts `RULE_CHANGE` to everyone.
+    *   **Interact:** Client sends `TILE_FLIP`. Server validates ownership and broadcasts `TILE_FLIP` with the updated cell data.
+
+3.  **The Game Loop (Server Output)**
+    *   Every **250ms** (default), the server calculates the next generation of the cellular automaton.
+    *   If any cells changed or ants moved, the server broadcasts a `GAME_STATE_SNAPSHOT` containing *only* the diffs (changed cells and current ant positions).
+    *   Clients merge these diffs into their local grid state.
+
+4.  **Disconnection**
+    *   When a socket closes (or fails heartbeat), the server removes the ant and broadcasts `PLAYER_LEAVE` to remaining clients.
+
 ---
 # Server Setup
 
