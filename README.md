@@ -51,7 +51,19 @@ yarn test
 ```
 
 #### 4 — Production build & deploy
-- Missing
+To deploy the API server to Heroku:
+
+1. Add the Heroku remote:
+```bash
+git remote add heroku https://git.heroku.com/langton-ants-simulation.git
+```
+
+2. Push the `api` subtree to Heroku:
+```bash
+git subtree push --prefix api heroku main
+```
+
+The application is hosted at: https://langton-ants-simulation-860ce5e40c4d.herokuapp.com/
 
 ---
 ## Technical Choices
@@ -90,7 +102,7 @@ With more time, I would have liked to implement and test the following:
 - Offload tick processing to worker threads to maintain WebSocket event loop responsiveness for larger grids.
 - Partition the grid across shards and broadcast merged diffs for larger loads (e.g. 10k×10k grid with 160 players)
 - Add a Redis layer plus periodic snapshots to enable restarts and historical replay.
-- Add a deployment script to deploy the server to a cloud provider.
+- ~Add a deployment script to deploy the server to a cloud provider.~ (Done)
 - Add support for other languages.
 - A full React front-end:
   - Canvas-based grid renderer that repaints only the diffed chunks received in each `GAME_STATE_SNAPSHOT` message
