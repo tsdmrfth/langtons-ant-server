@@ -6,7 +6,7 @@ This repository contains a **multiplayer, real-time, browser-based** implementat
 
 * **api/** – a Node + TypeScript WebSocket server responsible for game state, tick processing, validation and broadcasting.
   - For a complete description of all public classes, methods and message schemas see [API_REFERENCE.md](./api/API_REFERENCE.md).
-* **client/** – a React/Expo web application that renders the shared grid, lets the player define rules, place an ant, and interact with tiles.
+* **client/** – a React/Expo web application that renders the shared grid, lets the player define rules, place an ant, and interact with tiles. Client is hosted here: [tsdmrfth-langtons-ant.netlify.app](https://tsdmrfth-langtons-ant.netlify.app)
 
 The server maintains a single authoritative grid; clients receive incremental snapshots every 250 ms and render only the changed chunks for performance.
 
