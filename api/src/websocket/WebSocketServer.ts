@@ -51,6 +51,11 @@ export class WebSocketServer {
           type: 'PLAYER_JOIN',
           payload: { playerId: player.id, color: player.color }
         })
+        const fullState = this.gameEngine.getFullGameState()
+        this.sendToClient(socket, {
+          type: 'GAME_STATE_SNAPSHOT',
+          payload: fullState
+        })
         socket.on('message', (data: RawData) => {
           if (this.isRateLimited(player.id)) {
             this.handleError(socket, new Error('Rate limit exceeded'))

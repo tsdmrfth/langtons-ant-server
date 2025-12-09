@@ -283,4 +283,25 @@ export class GameEngine {
       ants: this.state.ants
     }
   }
+
+  public getFullGameState(): GameStateSnapshot {
+    const cells = this.state.grid.cells
+    const fullState: Record<string, Record<string, Color>> = {}
+    // Iterate over all chunks to gather all active cells
+    this.chunks.forEach((chunkCells, chunkKey) => {
+      if (chunkCells.size > 0) {
+        fullState[chunkKey] = {}
+        chunkCells.forEach(cellKey => {
+          const color = cells.get(cellKey)
+          if (color) {
+            fullState[chunkKey][cellKey] = color
+          }
+        })
+      }
+    })
+    return {
+      cells: fullState,
+      ants: this.state.ants
+    }
+  }
 } 
